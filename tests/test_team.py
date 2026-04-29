@@ -11,7 +11,7 @@ class TestNexusTeam:
         config = NexusConfig()
         team = NexusTeam(config)
 
-        assert team.agent_count == 9
+        assert team.agent_count == 10
         assert team.memory is not None
         assert team.tools is not None
 
@@ -58,11 +58,29 @@ class TestNexusTeam:
 
         assert result["completed"]
 
+    def test_run_frontend_task(self) -> None:
+        config = NexusConfig()
+        team = NexusTeam(config)
+
+        result = team.run("Build a React login component")
+
+        assert result["completed"]
+        assert "output" in result
+
+    def test_run_backend_task(self) -> None:
+        config = NexusConfig()
+        team = NexusTeam(config)
+
+        result = team.run("Create a REST API endpoint for users")
+
+        assert result["completed"]
+        assert "output" in result
+
     def test_run_generic_task(self) -> None:
         config = NexusConfig()
         team = NexusTeam(config)
 
-        result = team.run("Build a todo app with React frontend")
+        result = team.run("Build a todo app")
 
         assert result["completed"]
         assert "output" in result
@@ -71,8 +89,8 @@ class TestNexusTeam:
 class TestNexusConfig:
     def test_default_config(self) -> None:
         config = NexusConfig()
-        assert config.llm.provider == "openai"
-        assert config.llm.model == "gpt-4o"
+        assert config.llm.provider == "nvidia"
+        assert config.llm.model == "deepseek-ai/deepseek-v4-pro"
         assert config.max_iterations == 20
 
     def test_save_and_load(self, tmp_path) -> None:  # type: ignore[no-untyped-def]

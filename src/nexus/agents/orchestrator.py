@@ -51,7 +51,8 @@ Your responsibilities:
 
 You delegate to these agents:
 - planner: For breaking down complex tasks into structured plans
-- developer: For writing code and implementing features
+- frontend_developer: For building UIs, layouts, CSS, client-side logic, React/Vue/Angular
+- backend_developer: For building APIs, databases, server-side logic, authentication
 - debugger: For finding and fixing bugs
 - qa: For writing and running tests
 - research: For looking up documentation and external knowledge
@@ -160,6 +161,22 @@ Respond with a JSON object containing:
             target = "research"
         elif any(kw in task_lower for kw in ["review", "evaluate", "critique", "improve"]):
             target = "critic"
+        elif any(
+            kw in task_lower
+            for kw in [
+                "frontend", "ui", "component", "css", "html", "react",
+                "vue", "angular", "layout", "style", "responsive",
+            ]
+        ):
+            target = "frontend_developer"
+        elif any(
+            kw in task_lower
+            for kw in [
+                "backend", "api", "database", "server", "endpoint",
+                "rest", "graphql", "auth", "migration",
+            ]
+        ):
+            target = "backend_developer"
         else:
             target = "planner"
 
@@ -188,8 +205,9 @@ Respond with a JSON object containing:
             self._completed_tasks.append(task_info)
 
         if self.memory:
+            result_str = str(result)[:200] if result else ""
             self.memory.remember(
-                f"Task completed by {message.sender}: {result[:200]}",
+                f"Task completed by {message.sender}: {result_str}",
                 category="result",
                 persist=True,
                 collection="reflections",

@@ -22,6 +22,8 @@ class AgentRole(StrEnum):
     PLANNER = "planner"
     LEAD_DEVELOPER = "lead_developer"
     DEVELOPER = "developer"
+    FRONTEND_DEVELOPER = "frontend_developer"
+    BACKEND_DEVELOPER = "backend_developer"
     DEBUGGER = "debugger"
     QA = "qa"
     RESEARCH = "research"

@@ -8,18 +8,37 @@ from pathlib import Path
 
 import yaml
 
+# NVIDIA NIM model assignments per agent role
+NVIDIA_AGENT_MODELS: dict[str, str] = {
+    "orchestrator": "moonshotai/kimi-k2-5",
+    "planner": "z-ai/glm5.1",
+    "frontend_developer": "minimaxai/minimax-m2.7",
+    "backend_developer": "deepseek-ai/deepseek-v4-pro",
+    "debugger": "deepseek-ai/deepseek-v4-flash",
+    "qa": "google/gemma-4-31b-it",
+    "research": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "memory": "qwen/qwen3.5-397b-a17b",
+    "critic": "deepseek-ai/deepseek-v3.2",
+    "tool_executor": "mistralai/mistral-nemotron",
+}
+
 
 @dataclass
 class LLMConfig:
-    provider: str = "openai"
-    model: str = "gpt-4o"
+    provider: str = "nvidia"
+    model: str = "deepseek-ai/deepseek-v4-pro"
     temperature: float = 0.2
     max_tokens: int = 4096
     api_key: str = ""
 
     def __post_init__(self) -> None:
         if not self.api_key:
-            env_key = "OPENAI_API_KEY" if self.provider == "openai" else "ANTHROPIC_API_KEY"
+            env_keys = {
+                "nvidia": "NVIDIA_API_KEY",
+                "openai": "OPENAI_API_KEY",
+                "anthropic": "ANTHROPIC_API_KEY",
+            }
+            env_key = env_keys.get(self.provider, "NVIDIA_API_KEY")
             self.api_key = os.environ.get(env_key, "")
 
 

@@ -49,7 +49,11 @@ class LLMProvider(ABC):
 
 def create_provider(provider: str, api_key: str, model: str) -> LLMProvider:
     """Factory for creating LLM providers."""
-    if provider == "openai":
+    if provider == "nvidia":
+        from nexus.llm.nvidia_provider import NvidiaProvider
+
+        return NvidiaProvider(api_key=api_key, model=model)
+    elif provider == "openai":
         from nexus.llm.openai_provider import OpenAIProvider
 
         return OpenAIProvider(api_key=api_key, model=model)

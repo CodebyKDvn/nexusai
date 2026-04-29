@@ -15,7 +15,7 @@ from nexus.ui.terminal import TerminalUI
 
 @click.group(invoke_without_command=True)
 @click.option("--config", "-c", type=click.Path(), default=None, help="Config file path")
-@click.option("--provider", "-p", type=click.Choice(["openai", "anthropic"]), default=None)
+@click.option("--provider", "-p", type=click.Choice(["nvidia", "openai", "anthropic"]), default=None)
 @click.option("--model", "-m", default=None, help="LLM model name")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.pass_context
@@ -56,7 +56,7 @@ def _interactive(config: NexusConfig) -> None:
     if config.llm.api_key:
         ui.show_info(f"LLM: {config.llm.provider}/{config.llm.model}")
     else:
-        ui.show_info("No LLM API key set — using rule-based mode (set OPENAI_API_KEY or ANTHROPIC_API_KEY)")
+        ui.show_info("No LLM API key set — using rule-based mode (set NVIDIA_API_KEY)")
 
     while True:
         try:

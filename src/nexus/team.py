@@ -5,16 +5,17 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from nexus.agents.backend_developer import BackendDeveloperAgent
 from nexus.agents.critic import CriticAgent
 from nexus.agents.debugger import DebuggerAgent
-from nexus.agents.developer import DeveloperAgent
+from nexus.agents.frontend_developer import FrontendDeveloperAgent
 from nexus.agents.memory_agent import MemoryAgentImpl
 from nexus.agents.orchestrator import OrchestratorAgent
 from nexus.agents.planner import PlannerAgent
 from nexus.agents.qa import QAAgent
 from nexus.agents.research import ResearchAgent
 from nexus.agents.tool_executor import ToolExecutorAgent
-from nexus.config import NexusConfig
+from nexus.config import NVIDIA_AGENT_MODELS, NexusConfig
 from nexus.core.loop import AgentLoop
 from nexus.core.message import Message, MessageBus, MessageType
 from nexus.core.registry import AgentRegistry
@@ -37,58 +38,108 @@ class NexusTeam:
             short_term_capacity=self.config.memory.short_term_capacity,
         )
         self.tools = create_default_registry()
-        self.llm: LLMProvider | None = None
+        self._agent_llms: dict[str, LLMProvider] = {}
         self._results: list[dict[str, Any]] = []
 
-        self._init_llm()
+        self._init_llms()
         self._init_agents()
 
-    def _init_llm(self) -> None:
-        if self.config.llm.api_key:
-            try:
-                self.llm = create_provider(
-                    provider=self.config.llm.provider,
-                    api_key=self.config.llm.api_key,
-                    model=self.config.llm.model,
-                )
+    def _create_llm(self, model: str) -> LLMProvider | None:
+        """Create a provider instance for a specific model."""
+        if not self.config.llm.api_key:
+            return None
+        try:
+            return create_provider(
+                provider=self.config.llm.provider,
+                api_key=self.config.llm.api_key,
+                model=model,
+            )
+        except Exception as e:
+            logger.warning("Failed to create LLM for model %s: %s", model, e)
+            return None
+
+    def _init_llms(self) -> None:
+        """Initialize per-agent LLM providers with role-specific models."""
+        if not self.config.llm.api_key:
+            logger.info("No API key configured — agents will use rule-based fallbacks")
+            return
+
+        model_map = NVIDIA_AGENT_MODELS if self.config.llm.provider == "nvidia" else {}
+
+        for role, model in model_map.items():
+            llm = self._create_llm(model)
+            if llm:
+                self._agent_llms[role] = llm
+                logger.info("LLM for %s: %s", role, model)
+
+        if not model_map:
+            fallback = self._create_llm(self.config.llm.model)
+            if fallback:
+                for role in NVIDIA_AGENT_MODELS:
+                    self._agent_llms[role] = fallback
                 logger.info(
-                    "LLM provider initialized: %s/%s",
+                    "LLM provider initialized: %s/%s (shared)",
                     self.config.llm.provider,
                     self.config.llm.model,
                 )
-            except Exception as e:
-                logger.warning("Failed to initialize LLM: %s", e)
-        else:
-            logger.info("No API key configured — agents will use rule-based fallbacks")
+
+    def _llm_for(self, role: str) -> LLMProvider | None:
+        return self._agent_llms.get(role)
 
     def _init_agents(self) -> None:
         orchestrator = OrchestratorAgent(
-            "orchestrator", self.bus, llm=self.llm, memory=self.memory
+            "orchestrator", self.bus,
+            llm=self._llm_for("orchestrator"),
+            memory=self.memory,
         )
-        planner = PlannerAgent("planner", self.bus, llm=self.llm, memory=self.memory)
-        developer = DeveloperAgent(
-            "developer",
-            self.bus,
-            llm=self.llm,
+        planner = PlannerAgent(
+            "planner", self.bus,
+            llm=self._llm_for("planner"),
+            memory=self.memory,
+        )
+        frontend_dev = FrontendDeveloperAgent(
+            "frontend_developer", self.bus,
+            llm=self._llm_for("frontend_developer"),
             memory=self.memory,
             tools=self.tools,
-            specialty="fullstack",
+        )
+        backend_dev = BackendDeveloperAgent(
+            "backend_developer", self.bus,
+            llm=self._llm_for("backend_developer"),
+            memory=self.memory,
+            tools=self.tools,
         )
         debugger = DebuggerAgent(
-            "debugger", self.bus, llm=self.llm, memory=self.memory, tools=self.tools
+            "debugger", self.bus,
+            llm=self._llm_for("debugger"),
+            memory=self.memory,
+            tools=self.tools,
         )
-        qa = QAAgent("qa", self.bus, llm=self.llm, memory=self.memory, tools=self.tools)
+        qa = QAAgent(
+            "qa", self.bus,
+            llm=self._llm_for("qa"),
+            memory=self.memory,
+            tools=self.tools,
+        )
         research = ResearchAgent(
-            "research", self.bus, llm=self.llm, memory=self.memory, tools=self.tools
+            "research", self.bus,
+            llm=self._llm_for("research"),
+            memory=self.memory,
+            tools=self.tools,
         )
         memory_agent = MemoryAgentImpl("memory", self.bus, memory=self.memory)
-        critic = CriticAgent("critic", self.bus, llm=self.llm, memory=self.memory)
+        critic = CriticAgent(
+            "critic", self.bus,
+            llm=self._llm_for("critic"),
+            memory=self.memory,
+        )
         tool_exec = ToolExecutorAgent("tool_executor", self.bus, tools=self.tools)
 
         for agent in [
             orchestrator,
             planner,
-            developer,
+            frontend_dev,
+            backend_dev,
             debugger,
             qa,
             research,
@@ -117,7 +168,7 @@ class NexusTeam:
         loop = AgentLoop(self.registry, max_iterations=self.config.max_iterations)
         state = loop.run(initial_message)
 
-        result = {
+        result: dict[str, Any] = {
             "completed": state.completed,
             "iterations": state.iteration,
             "results": state.results,

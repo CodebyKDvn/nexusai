@@ -4,11 +4,11 @@
 
 ## Features
 
-- **10 Specialized Agents** — Orchestrator, Planner, Developer, Debugger, QA, Research, Memory, Critic, and Tool Executor
-- **Intelligent Task Routing** — Automatically delegates tasks to the right specialist
+- **10 Specialized Agents** — Orchestrator, Planner, Frontend Developer, Backend Developer, Debugger, QA, Research, Memory, Critic, and Tool Executor
+- **NVIDIA NIM Integration** — Each agent is powered by a dedicated NVIDIA NIM model optimized for its role
+- **Intelligent Task Routing** — Automatically delegates tasks to the right specialist (frontend vs backend, debug, test, etc.)
 - **Persistent Memory** — Short-term context + long-term vector storage with RAG retrieval
 - **Tool System** — File operations, terminal execution, git, code search, web browsing, API calls
-- **LLM Integration** — OpenAI and Anthropic providers with retry, token tracking, and function calling
 - **Self-Improvement** — Critic agent evaluates outputs and stores lessons for future tasks
 - **Rich Terminal UI** — Interactive CLI with status panels, plan visualization, and evaluation reports
 
@@ -18,7 +18,8 @@
 User Request
     │
     ▼
-Orchestrator ──► Planner ──► Developer(s)
+Orchestrator ──► Planner ──► Frontend Developer
+    │                    └──► Backend Developer
     │                            │
     ├──► Debugger ◄──────────────┘
     ├──► QA Agent
@@ -44,14 +45,10 @@ pip install -e ".[dev]"
 
 ### Configuration
 
-Set your LLM API key:
+Set your NVIDIA NIM API key:
 
 ```bash
-# OpenAI
-export OPENAI_API_KEY="sk-..."
-
-# Or Anthropic
-export ANTHROPIC_API_KEY="sk-ant-..."
+export NVIDIA_API_KEY="nvapi-..."
 ```
 
 ### Interactive Mode
@@ -64,7 +61,8 @@ This launches the interactive REPL where you can submit tasks to the AI dev team
 
 ```
 nexus> Plan a REST API for user management
-nexus> Build a todo app with React and FastAPI
+nexus> Build a React component for user authentication
+nexus> Create a REST API backend for user management
 nexus> Fix the bug in the authentication module
 ```
 
@@ -100,8 +98,8 @@ Edit `.nexus/config.yaml`:
 
 ```yaml
 llm:
-  provider: openai        # or "anthropic"
-  model: gpt-4o           # or "claude-sonnet-4-20250514"
+  provider: nvidia          # "nvidia" (default), "openai", or "anthropic"
+  model: deepseek-ai/deepseek-v4-pro
   temperature: 0.2
   max_tokens: 4096
 
@@ -117,19 +115,22 @@ max_iterations: 20
 log_level: INFO
 ```
 
-## Agent Roles
+## Agent Roles & Models
 
-| Agent | Role |
-|-------|------|
-| **Orchestrator** | Receives requests, clarifies intent, delegates work, tracks progress |
-| **Planner** | Breaks tasks into structured plans with milestones and dependencies |
-| **Developer** | Writes code, designs APIs, implements features |
-| **Debugger** | Analyzes errors, traces bugs, proposes and applies fixes |
-| **QA** | Writes tests, runs test suites, validates correctness |
-| **Research** | Searches docs, codebases, and web for relevant knowledge |
-| **Memory** | Stores and retrieves patterns, decisions, bugs, and preferences |
-| **Critic** | Evaluates output quality, scores on 6 criteria, drives improvement |
-| **Tool Executor** | Executes file ops, terminal commands, git, search, API calls |
+Each agent is assigned a specialized NVIDIA NIM model:
+
+| Agent | Role | NVIDIA NIM Model |
+|-------|------|------------------|
+| **Orchestrator** | Receives requests, clarifies intent, delegates work | `moonshotai/kimi-k2-5` |
+| **Planner** | Breaks tasks into structured plans with milestones | `z-ai/glm5.1` |
+| **Frontend Developer** | Builds UIs, components, CSS, client-side logic | `minimaxai/minimax-m2.7` |
+| **Backend Developer** | Builds APIs, databases, server-side services | `deepseek-ai/deepseek-v4-pro` |
+| **Debugger** | Analyzes errors, traces bugs, applies fixes | `deepseek-ai/deepseek-v4-flash` |
+| **QA** | Writes tests, validates correctness | `google/gemma-4-31b-it` |
+| **Research** | Searches docs, codebases, and web for knowledge | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` |
+| **Memory** | Stores and retrieves patterns, decisions, bugs | `qwen/qwen3.5-397b-a17b` |
+| **Critic** | Evaluates output quality, drives improvement | `deepseek-ai/deepseek-v3.2` |
+| **Tool Executor** | Executes file ops, terminal, git, search, API calls | `mistralai/mistral-nemotron` |
 
 ## Development
 
