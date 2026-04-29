@@ -14,6 +14,7 @@ NVIDIA_AGENT_MODELS: dict[str, str] = {
     "planner": "z-ai/glm5.1",
     "frontend_developer": "minimaxai/minimax-m2.7",
     "backend_developer": "deepseek-ai/deepseek-v4-pro",
+    "ux_ui_designer": "moonshotai/kimi-k2-5",
     "debugger": "deepseek-ai/deepseek-v4-flash",
     "qa": "google/gemma-4-31b-it",
     "research": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",

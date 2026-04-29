@@ -11,7 +11,7 @@ class TestNexusTeam:
         config = NexusConfig()
         team = NexusTeam(config)
 
-        assert team.agent_count == 10
+        assert team.agent_count == 11
         assert team.memory is not None
         assert team.tools is not None
 
@@ -72,6 +72,15 @@ class TestNexusTeam:
         team = NexusTeam(config)
 
         result = team.run("Create a REST API endpoint for users")
+
+        assert result["completed"]
+        assert "output" in result
+
+    def test_run_design_task(self) -> None:
+        config = NexusConfig()
+        team = NexusTeam(config)
+
+        result = team.run("Design a prototype for the user dashboard")
 
         assert result["completed"]
         assert "output" in result

@@ -24,6 +24,7 @@ class AgentRole(StrEnum):
     DEVELOPER = "developer"
     FRONTEND_DEVELOPER = "frontend_developer"
     BACKEND_DEVELOPER = "backend_developer"
+    UX_UI_DESIGNER = "ux_ui_designer"
     DEBUGGER = "debugger"
     QA = "qa"
     RESEARCH = "research"

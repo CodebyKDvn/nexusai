@@ -22,16 +22,19 @@ Nexus AI is a multi-agent AI development platform that operates as an autonomous
 └────────┼───────────────┼──────────────────┼─────────────┘
          │               │                  │
 ┌────────▼───────────────▼──────────────────▼─────────────┐
-│                    Agent Layer (10 Agents)               │
-│  ┌──────────┐ ┌──────────────┐ ┌───────────────┐        │
-│  │ Planner  │ │ Frontend Dev │ │ Backend Dev   │        │
-│  └──────────┘ └──────────────┘ └───────────────┘        │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
-│  │ Debugger │ │   QA     │ │ Research │ │  Critic  │   │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘   │
-│  ┌──────────┐ ┌──────────────┐                          │
-│  │  Memory  │ │ Tool Executor│                          │
-│  └──────────┘ └──────────────┘                          │
+│                    Agent Layer (11 Agents)               │
+│  ┌──────────┐ ┌────────────────┐ ┌───────────────┐      │
+│  │ Planner  │ │ UX/UI Designer │ │ Frontend Dev  │      │
+│  └──────────┘ └────────────────┘ └───────────────┘      │
+│  ┌───────────────┐ ┌──────────┐ ┌──────────┐         │
+│  │ Backend Dev   │ │ Debugger │ │   QA     │         │
+│  └───────────────┘ └──────────┘ └──────────┘         │
+│  ┌──────────┐ ┌──────────┐ ┌──────────────┐        │
+│  │ Research │ │  Critic  │ │  Memory      │        │
+│  └──────────┘ └──────────┘ └──────────────┘        │
+│  ┌──────────────┐                                    │
+│  │ Tool Executor│                                    │
+│  └──────────────┘                                    │
 └──────────────────────┬──────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────┐
@@ -58,6 +61,7 @@ Each agent is assigned a specific NVIDIA NIM model via the OpenAI-compatible API
 |-------|-------|--------|
 | Orchestrator | `moonshotai/kimi-k2-5` | Strong reasoning for task decomposition and delegation |
 | Planner | `z-ai/glm5.1` | Structured output generation for plans and milestones |
+| UX/UI Designer | `moonshotai/kimi-k2-5` | Design thinking and visual reasoning using [Huashu Design](https://github.com/alchaincyf/huashu-design) philosophies |
 | Frontend Developer | `minimaxai/minimax-m2.7` | MoE model excelling at UI/frontend code generation |
 | Backend Developer | `deepseek-ai/deepseek-v4-pro` | Top-tier code generation for APIs, databases, services |
 | Debugger | `deepseek-ai/deepseek-v4-flash` | Fast inference for iterative debugging cycles |

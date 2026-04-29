@@ -15,6 +15,7 @@ from nexus.agents.planner import PlannerAgent
 from nexus.agents.qa import QAAgent
 from nexus.agents.research import ResearchAgent
 from nexus.agents.tool_executor import ToolExecutorAgent
+from nexus.agents.ux_ui_designer import UxUiDesignerAgent
 from nexus.config import NVIDIA_AGENT_MODELS, NexusConfig
 from nexus.core.loop import AgentLoop
 from nexus.core.message import Message, MessageBus, MessageType
@@ -103,6 +104,12 @@ class NexusTeam:
             memory=self.memory,
             tools=self.tools,
         )
+        ux_ui_designer = UxUiDesignerAgent(
+            "ux_ui_designer", self.bus,
+            llm=self._llm_for("ux_ui_designer"),
+            memory=self.memory,
+            tools=self.tools,
+        )
         backend_dev = BackendDeveloperAgent(
             "backend_developer", self.bus,
             llm=self._llm_for("backend_developer"),
@@ -139,6 +146,7 @@ class NexusTeam:
             orchestrator,
             planner,
             frontend_dev,
+            ux_ui_designer,
             backend_dev,
             debugger,
             qa,

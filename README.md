@@ -4,7 +4,7 @@
 
 ## Features
 
-- **10 Specialized Agents** — Orchestrator, Planner, Frontend Developer, Backend Developer, Debugger, QA, Research, Memory, Critic, and Tool Executor
+- **11 Specialized Agents** — Orchestrator, Planner, UX/UI Designer, Frontend Developer, Backend Developer, Debugger, QA, Research, Memory, Critic, and Tool Executor
 - **NVIDIA NIM Integration** — Each agent is powered by a dedicated NVIDIA NIM model optimized for its role
 - **Intelligent Task Routing** — Automatically delegates tasks to the right specialist (frontend vs backend, debug, test, etc.)
 - **Persistent Memory** — Short-term context + long-term vector storage with RAG retrieval
@@ -18,7 +18,7 @@
 User Request
     │
     ▼
-Orchestrator ──► Planner ──► Frontend Developer
+Orchestrator ──► Planner ──► UX/UI Designer ──► Frontend Developer
     │                    └──► Backend Developer
     │                            │
     ├──► Debugger ◄──────────────┘
@@ -61,6 +61,7 @@ This launches the interactive REPL where you can submit tasks to the AI dev team
 
 ```
 nexus> Plan a REST API for user management
+nexus> Design a prototype for the user dashboard
 nexus> Build a React component for user authentication
 nexus> Create a REST API backend for user management
 nexus> Fix the bug in the authentication module
@@ -123,6 +124,7 @@ Each agent is assigned a specialized NVIDIA NIM model:
 |-------|------|------------------|
 | **Orchestrator** | Receives requests, clarifies intent, delegates work | `moonshotai/kimi-k2-5` |
 | **Planner** | Breaks tasks into structured plans with milestones | `z-ai/glm5.1` |
+| **UX/UI Designer** | Designs prototypes, visual systems using [Huashu Design](https://github.com/alchaincyf/huashu-design) principles — 20 design philosophies, 5-dimension review, anti-AI-slop rules | `moonshotai/kimi-k2-5` |
 | **Frontend Developer** | Builds UIs, components, CSS, client-side logic | `minimaxai/minimax-m2.7` |
 | **Backend Developer** | Builds APIs, databases, server-side services | `deepseek-ai/deepseek-v4-pro` |
 | **Debugger** | Analyzes errors, traces bugs, applies fixes | `deepseek-ai/deepseek-v4-flash` |

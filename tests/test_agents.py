@@ -12,6 +12,7 @@ from nexus.agents.planner import PlannerAgent
 from nexus.agents.qa import QAAgent
 from nexus.agents.research import ResearchAgent
 from nexus.agents.tool_executor import ToolExecutorAgent
+from nexus.agents.ux_ui_designer import UxUiDesignerAgent
 from nexus.core.message import Message, MessageBus, MessageType
 from nexus.core.tool import ToolRegistry
 from nexus.memory.manager import MemoryManager
@@ -64,6 +65,21 @@ class TestOrchestratorAgent:
 
         assert response is not None
         assert response.recipient == "qa"
+
+    def test_rule_based_delegation_design(self) -> None:
+        bus = MessageBus()
+        agent = OrchestratorAgent("orchestrator", bus)
+
+        msg = Message(
+            sender="user",
+            recipient="orchestrator",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Design a prototype for the dashboard"},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.recipient == "ux_ui_designer"
 
     def test_rule_based_delegation_frontend(self) -> None:
         bus = MessageBus()
@@ -156,6 +172,59 @@ class TestPlannerAgent:
             recipient="planner",
             type=MessageType.STATUS,
             payload={},
+        )
+        response = agent.process(msg)
+        assert response is None
+
+
+class TestUxUiDesignerAgent:
+    def test_stub_design_direction(self) -> None:
+        bus = MessageBus()
+        agent = UxUiDesignerAgent("ux_ui_designer", bus)
+
+        msg = Message(
+            sender="orchestrator",
+            recipient="ux_ui_designer",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Design a visual style for the landing page", "context": ""},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.type == MessageType.TASK_RESULT
+        assert response.payload["status"] == "needs_review"
+        result = response.payload.get("result", {})
+        assert result.get("action") == "recommend_directions"
+        assert len(result.get("directions", [])) == 3
+
+    def test_stub_specific_design(self) -> None:
+        bus = MessageBus()
+        agent = UxUiDesignerAgent("ux_ui_designer", bus)
+
+        msg = Message(
+            sender="orchestrator",
+            recipient="ux_ui_designer",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Create a prototype for a mobile login screen", "context": ""},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.type == MessageType.TASK_RESULT
+        result = response.payload.get("result", {})
+        assert result.get("action") == "complete"
+        assert "design_spec" in result
+        assert "suggestions" in result
+
+    def test_ignores_non_task_messages(self) -> None:
+        bus = MessageBus()
+        agent = UxUiDesignerAgent("ux_ui_designer", bus)
+
+        msg = Message(
+            sender="orchestrator",
+            recipient="ux_ui_designer",
+            type=MessageType.EVENT,
+            payload={"event": "some_event"},
         )
         response = agent.process(msg)
         assert response is None

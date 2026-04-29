@@ -10,6 +10,7 @@ from nexus.agents.planner import PlannerAgent
 from nexus.agents.qa import QAAgent
 from nexus.agents.research import ResearchAgent
 from nexus.agents.tool_executor import ToolExecutorAgent
+from nexus.agents.ux_ui_designer import UxUiDesignerAgent
 
 __all__ = [
     "BackendDeveloperAgent",
@@ -22,4 +23,5 @@ __all__ = [
     "QAAgent",
     "ResearchAgent",
     "ToolExecutorAgent",
+    "UxUiDesignerAgent",
 ]
