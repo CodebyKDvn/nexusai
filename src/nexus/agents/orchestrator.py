@@ -123,6 +123,11 @@ Respond with a JSON object containing:
 
         if action == "delegate":
             target = decision.get("target_agent", "planner")
+            self._active_tasks[correlation_id] = {
+                "task": task,
+                "target": target,
+                "status": "delegated",
+            }
             return self.send(
                 target,
                 MessageType.TASK_REQUEST,
@@ -243,6 +248,7 @@ Respond with a JSON object containing:
             )
 
         # Pop from active tasks on completion (after review check)
+        task_info: dict[str, Any] | None = None
         if correlation_id and correlation_id in self._active_tasks:
             task_info = self._active_tasks.pop(correlation_id)
             task_info["status"] = status
@@ -256,11 +262,7 @@ Respond with a JSON object containing:
             review_count = self._review_counts.get(cid, 0)
             if verdict == "revise" and review_count < self._max_reviews:
                 self._review_counts[cid] = review_count + 1
-                original_sender = "frontend_developer"
-                for task in reversed(self._completed_tasks):
-                    if task.get("original_sender"):
-                        original_sender = task["original_sender"]
-                        break
+                original_sender = task_info.get("original_sender", "planner") if task_info else "planner"
                 return self.send(
                     original_sender,
                     MessageType.TASK_REQUEST,
