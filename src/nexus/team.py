@@ -16,7 +16,7 @@ from nexus.agents.qa import QAAgent
 from nexus.agents.research import ResearchAgent
 from nexus.agents.tool_executor import ToolExecutorAgent
 from nexus.agents.ux_ui_designer import UxUiDesignerAgent
-from nexus.config import NVIDIA_AGENT_MODELS, NexusConfig
+from nexus.config import NO_LLM_ROLES, NVIDIA_AGENT_MODELS, NexusConfig
 from nexus.core.loop import AgentLoop
 from nexus.core.message import Message, MessageBus, MessageType
 from nexus.core.registry import AgentRegistry
@@ -60,29 +60,56 @@ class NexusTeam:
             return None
 
     def _init_llms(self) -> None:
-        """Initialize per-agent LLM providers with role-specific models."""
+        """Initialize per-agent LLM providers with role-specific models.
+
+        Iterates through every ``AgentRole`` and assigns an LLM provider:
+        * Roles listed in ``NO_LLM_ROLES`` (memory, tool_executor) are skipped.
+        * For the *nvidia* provider, the role-specific model from
+          ``NVIDIA_AGENT_MODELS`` is attempted first.
+        * If the role has no dedicated model **or** model creation fails, the
+          default model (``self.config.llm.model``) is used as a fallback.
+        * This guarantees every active role gets a working LLM when an API key
+          is configured.
+        """
         if not self.config.llm.api_key:
             logger.info("No API key configured — agents will use rule-based fallbacks")
             return
 
-        model_map = NVIDIA_AGENT_MODELS if self.config.llm.provider == "nvidia" else {}
+        from nexus.core.agent import AgentRole
 
-        for role, model in model_map.items():
-            llm = self._create_llm(model)
+        default_model = self.config.llm.model
+        is_nvidia = self.config.llm.provider == "nvidia"
+
+        for role in AgentRole:
+            role_name: str = role.value
+
+            if role_name in NO_LLM_ROLES:
+                continue
+
+            llm: LLMProvider | None = None
+
+            # Try role-specific model when using nvidia provider
+            if is_nvidia:
+                specific_model = NVIDIA_AGENT_MODELS.get(role_name)
+                if specific_model:
+                    llm = self._create_llm(specific_model)
+                    if llm:
+                        self._agent_llms[role_name] = llm
+                        logger.info("LLM for %s: %s", role_name, specific_model)
+                        continue
+                    logger.warning(
+                        "Role-specific model %s failed for %s, falling back to default",
+                        specific_model,
+                        role_name,
+                    )
+
+            # Fallback to default model
+            llm = self._create_llm(default_model)
             if llm:
-                self._agent_llms[role] = llm
-                logger.info("LLM for %s: %s", role, model)
-
-        if not model_map:
-            fallback = self._create_llm(self.config.llm.model)
-            if fallback:
-                for role in NVIDIA_AGENT_MODELS:
-                    self._agent_llms[role] = fallback
-                logger.info(
-                    "LLM provider initialized: %s/%s (shared)",
-                    self.config.llm.provider,
-                    self.config.llm.model,
-                )
+                self._agent_llms[role_name] = llm
+                logger.info("LLM for %s: %s (fallback)", role_name, default_model)
+            else:
+                logger.error("Failed to create any LLM for role %s", role_name)
 
     def _llm_for(self, role: str) -> LLMProvider | None:
         return self._agent_llms.get(role)

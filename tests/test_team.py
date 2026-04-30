@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from nexus.config import NexusConfig
+from unittest.mock import MagicMock, patch
+
+from nexus.config import NO_LLM_ROLES, NVIDIA_AGENT_MODELS, NexusConfig
+from nexus.core.agent import AgentRole
 from nexus.team import NexusTeam
 
 
@@ -115,3 +118,98 @@ class TestNexusConfig:
         assert loaded.llm.provider == "anthropic"
         assert loaded.llm.model == "claude-sonnet-4-20250514"
         assert loaded.max_iterations == 30
+
+
+class TestNvidiaAgentModels:
+    """Tests for NVIDIA_AGENT_MODELS configuration correctness."""
+
+    def test_model_names_spelling(self) -> None:
+        assert NVIDIA_AGENT_MODELS["orchestrator"] == "moonshotai/kimi-k2.5"
+        assert NVIDIA_AGENT_MODELS["planner"] == "z-ai/glm-5.1"
+        assert NVIDIA_AGENT_MODELS["ux_ui_designer"] == "moonshotai/kimi-k2.5"
+
+    def test_lead_developer_and_developer_present(self) -> None:
+        assert "lead_developer" in NVIDIA_AGENT_MODELS
+        assert NVIDIA_AGENT_MODELS["lead_developer"] == "deepseek-ai/deepseek-v4-pro"
+        assert "developer" in NVIDIA_AGENT_MODELS
+        assert NVIDIA_AGENT_MODELS["developer"] == "deepseek-ai/deepseek-v4-flash"
+
+    def test_no_llm_roles_defined(self) -> None:
+        assert "memory" in NO_LLM_ROLES
+        assert "tool_executor" in NO_LLM_ROLES
+
+
+class TestLLMInitialization:
+    """Tests for _init_llms robustness and fallback logic."""
+
+    def test_no_api_key_skips_initialization(self) -> None:
+        config = NexusConfig()
+        config.llm.api_key = ""
+        team = NexusTeam(config)
+        assert len(team._agent_llms) == 0
+
+    @patch("nexus.team.create_provider")
+    def test_nvidia_assigns_all_active_roles(self, mock_create: MagicMock) -> None:
+        mock_provider = MagicMock()
+        mock_create.return_value = mock_provider
+
+        config = NexusConfig()
+        config.llm.provider = "nvidia"
+        config.llm.api_key = "test-key"
+        team = NexusTeam(config)
+
+        active_roles = {r.value for r in AgentRole} - NO_LLM_ROLES
+        for role in active_roles:
+            assert role in team._agent_llms, f"Role {role} missing from _agent_llms"
+
+    @patch("nexus.team.create_provider")
+    def test_memory_and_tool_executor_excluded(self, mock_create: MagicMock) -> None:
+        mock_create.return_value = MagicMock()
+
+        config = NexusConfig()
+        config.llm.provider = "nvidia"
+        config.llm.api_key = "test-key"
+        team = NexusTeam(config)
+
+        assert "memory" not in team._agent_llms
+        assert "tool_executor" not in team._agent_llms
+
+    @patch("nexus.team.create_provider")
+    def test_fallback_when_specific_model_fails(self, mock_create: MagicMock) -> None:
+        """If a role-specific model fails, fallback to default model."""
+        call_count = 0
+
+        def side_effect(provider: str, api_key: str, model: str) -> MagicMock | None:
+            nonlocal call_count
+            call_count += 1
+            # Fail for the first model (orchestrator's kimi-k2.5), succeed for default
+            if model == "moonshotai/kimi-k2.5":
+                raise RuntimeError("Model unavailable")
+            return MagicMock()
+
+        mock_create.side_effect = side_effect
+
+        config = NexusConfig()
+        config.llm.provider = "nvidia"
+        config.llm.api_key = "test-key"
+        team = NexusTeam(config)
+
+        # orchestrator should still have an LLM (fallback to default)
+        assert "orchestrator" in team._agent_llms
+
+    @patch("nexus.team.create_provider")
+    def test_non_nvidia_provider_uses_default_model(
+        self, mock_create: MagicMock,
+    ) -> None:
+        mock_provider = MagicMock()
+        mock_create.return_value = mock_provider
+
+        config = NexusConfig()
+        config.llm.provider = "openai"
+        config.llm.api_key = "test-key"
+        config.llm.model = "gpt-4o"
+        team = NexusTeam(config)
+
+        active_roles = {r.value for r in AgentRole} - NO_LLM_ROLES
+        for role in active_roles:
+            assert role in team._agent_llms, f"Role {role} missing for openai provider"
