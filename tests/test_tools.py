@@ -4,9 +4,21 @@ from __future__ import annotations
 
 import os
 import tempfile
+from unittest.mock import patch
 
 from nexus.core.tool import ToolRegistry
 from nexus.tools.file_ops import FileDeleteTool, FileEditTool, FileReadTool, FileWriteTool
+from nexus.tools.gitnexus import (
+    GITNEXUS_TOOLS,
+    GitNexusAnalyzeTool,
+    GitNexusContextTool,
+    GitNexusDetectChangesTool,
+    GitNexusImpactTool,
+    GitNexusListTool,
+    GitNexusQueryTool,
+    GitNexusStatusTool,
+    is_gitnexus_available,
+)
 from nexus.tools.search import GrepTool
 from nexus.tools.terminal import TerminalTool
 
@@ -167,3 +179,104 @@ class TestToolRegistry:
         assert len(schemas) == 1
         assert schemas[0]["type"] == "function"
         assert schemas[0]["function"]["name"] == "file_read"
+
+
+class TestGitNexusTools:
+    """Tests for GitNexus code intelligence tools."""
+
+    def test_tool_count(self) -> None:
+        assert len(GITNEXUS_TOOLS) == 7
+
+    def test_tool_names(self) -> None:
+        names = {t.name for t in GITNEXUS_TOOLS}
+        expected = {
+            "gitnexus_analyze",
+            "gitnexus_query",
+            "gitnexus_context",
+            "gitnexus_impact",
+            "gitnexus_detect_changes",
+            "gitnexus_status",
+            "gitnexus_list",
+        }
+        assert names == expected
+
+    def test_tool_schemas(self) -> None:
+        for tool in GITNEXUS_TOOLS:
+            schema = tool.to_schema()
+            assert schema["type"] == "function"
+            assert schema["function"]["name"] == tool.name
+            assert "description" in schema["function"]
+
+    def test_query_requires_query_param(self) -> None:
+        tool = GitNexusQueryTool()
+        errors = tool.validate_params()
+        assert any("query" in e for e in errors)
+
+    def test_query_valid_params(self) -> None:
+        tool = GitNexusQueryTool()
+        errors = tool.validate_params(query="auth flow")
+        assert len(errors) == 0
+
+    def test_context_requires_name_param(self) -> None:
+        tool = GitNexusContextTool()
+        errors = tool.validate_params()
+        assert any("name" in e for e in errors)
+
+    def test_impact_requires_target_param(self) -> None:
+        tool = GitNexusImpactTool()
+        errors = tool.validate_params()
+        assert any("target" in e for e in errors)
+
+    def test_analyze_optional_params(self) -> None:
+        tool = GitNexusAnalyzeTool()
+        errors = tool.validate_params()
+        assert len(errors) == 0
+
+    def test_status_optional_params(self) -> None:
+        tool = GitNexusStatusTool()
+        errors = tool.validate_params()
+        assert len(errors) == 0
+
+    def test_list_no_params(self) -> None:
+        tool = GitNexusListTool()
+        errors = tool.validate_params()
+        assert len(errors) == 0
+
+    def test_detect_changes_optional_params(self) -> None:
+        tool = GitNexusDetectChangesTool()
+        errors = tool.validate_params()
+        assert len(errors) == 0
+
+    @patch("nexus.tools.gitnexus.shutil.which", return_value=None)
+    def test_not_available_when_not_installed(self, mock_which: object) -> None:
+        assert not is_gitnexus_available()
+
+    @patch("nexus.tools.gitnexus.shutil.which", return_value="/usr/bin/gitnexus")
+    def test_available_when_installed(self, mock_which: object) -> None:
+        assert is_gitnexus_available()
+
+    @patch("nexus.tools.gitnexus.shutil.which", return_value=None)
+    def test_execute_without_binary_returns_error(self, mock_which: object) -> None:
+        tool = GitNexusQueryTool()
+        result = tool.execute(query="test")
+        assert not result.ok
+        assert "not installed" in (result.error or "").lower()
+
+    def test_registry_includes_gitnexus_when_available(self) -> None:
+        with (
+            patch("nexus.tools.gitnexus.shutil.which", return_value="/usr/bin/gitnexus"),
+            patch("nexus.tools.__init__.is_gitnexus_available", return_value=True),
+        ):
+            from nexus.tools import create_default_registry
+
+            registry = create_default_registry()
+            assert registry.get("gitnexus_query") is not None
+
+    def test_registry_excludes_gitnexus_when_unavailable(self) -> None:
+        with patch(
+            "nexus.tools.is_gitnexus_available", return_value=False
+        ):
+            from nexus.tools import create_default_registry
+
+            registry = create_default_registry()
+            assert registry.get("gitnexus_query") is None

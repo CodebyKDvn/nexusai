@@ -324,6 +324,24 @@ class TestResearchAgent:
         result = response.payload.get("result", {})
         assert "findings" in result
 
+    def test_system_prompt_includes_gitnexus_when_tools_available(self) -> None:
+        from nexus.core.tool import ToolRegistry
+        from nexus.tools.gitnexus import GitNexusQueryTool
+
+        bus = MessageBus()
+        registry = ToolRegistry()
+        registry.register(GitNexusQueryTool())
+        agent = ResearchAgent("research", bus, tools=registry)
+
+        assert "gitnexus_query" in agent.system_prompt
+        assert "GitNexus" in agent.system_prompt
+
+    def test_system_prompt_excludes_gitnexus_without_tools(self) -> None:
+        bus = MessageBus()
+        agent = ResearchAgent("research", bus)
+
+        assert "gitnexus" not in agent.system_prompt.lower()
+
 
 class TestMemoryAgentImpl:
     def test_query(self) -> None:

@@ -167,7 +167,14 @@ Respond with a JSON object containing:
             target = "debugger"
         elif any(kw in task_lower for kw in ["test", "verify", "validate", "qa"]):
             target = "qa"
-        elif any(kw in task_lower for kw in ["search", "find", "look up", "research", "docs"]):
+        elif any(
+            kw in task_lower
+            for kw in [
+                "search", "find", "look up", "research", "docs",
+                "analyze codebase", "code intelligence", "knowledge graph",
+                "index repo", "blast radius", "impact analysis",
+            ]
+        ):
             target = "research"
         elif any(kw in task_lower for kw in ["review", "evaluate", "critique", "improve"]):
             target = "critic"

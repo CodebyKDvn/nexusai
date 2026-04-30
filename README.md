@@ -9,6 +9,7 @@
 - **Intelligent Task Routing** — Automatically delegates tasks to the right specialist (frontend vs backend, debug, test, etc.)
 - **Persistent Memory** — Short-term context + long-term vector storage with RAG retrieval
 - **Tool System** — File operations, terminal execution, git, code search, web browsing, API calls
+- **GitNexus Code Intelligence** — Indexes codebases into knowledge graphs for token-efficient analysis (query by concept, blast radius, symbol context)
 - **Self-Improvement** — Critic agent evaluates outputs and stores lessons for future tasks
 - **Rich Terminal UI** — Interactive CLI with status panels, plan visualization, and evaluation reports
 
@@ -122,17 +123,19 @@ Each agent is assigned a specialized NVIDIA NIM model:
 
 | Agent | Role | NVIDIA NIM Model |
 |-------|------|------------------|
-| **Orchestrator** | Receives requests, clarifies intent, delegates work | `moonshotai/kimi-k2-5` |
-| **Planner** | Breaks tasks into structured plans with milestones | `z-ai/glm5.1` |
-| **UX/UI Designer** | Designs prototypes, visual systems using [Huashu Design](https://github.com/alchaincyf/huashu-design) principles — 20 design philosophies, 5-dimension review, anti-AI-slop rules | `moonshotai/kimi-k2-5` |
+| **Orchestrator** | Receives requests, clarifies intent, delegates work | `moonshotai/kimi-k2.5` |
+| **Planner** | Breaks tasks into structured plans with milestones | `z-ai/glm-5.1` |
+| **Lead Developer** | Designs system architecture, APIs, data flow | `deepseek-ai/deepseek-v4-pro` |
+| **Developer** | Implements features, follows coding standards | `deepseek-ai/deepseek-v4-flash` |
+| **UX/UI Designer** | Designs prototypes, visual systems using [Huashu Design](https://github.com/alchaincyf/huashu-design) principles — 20 design philosophies, 5-dimension review, anti-AI-slop rules | `moonshotai/kimi-k2.5` |
 | **Frontend Developer** | Builds UIs, components, CSS, client-side logic | `minimaxai/minimax-m2.7` |
 | **Backend Developer** | Builds APIs, databases, server-side services | `deepseek-ai/deepseek-v4-pro` |
 | **Debugger** | Analyzes errors, traces bugs, applies fixes | `deepseek-ai/deepseek-v4-flash` |
 | **QA** | Writes tests, validates correctness | `google/gemma-4-31b-it` |
 | **Research** | Searches docs, codebases, and web for knowledge | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` |
-| **Memory** | Stores and retrieves patterns, decisions, bugs | `qwen/qwen3.5-397b-a17b` |
+| **Memory** | Stores and retrieves patterns, decisions, bugs | N/A (no LLM needed) |
 | **Critic** | Evaluates output quality, drives improvement | `deepseek-ai/deepseek-v3.2` |
-| **Tool Executor** | Executes file ops, terminal, git, search, API calls | `mistralai/mistral-nemotron` |
+| **Tool Executor** | Executes file ops, terminal, git, search, API calls | N/A (no LLM needed) |
 
 ## Development
 
@@ -149,6 +152,30 @@ ruff check src/ tests/
 # Type check
 mypy src/
 ```
+
+## GitNexus Code Intelligence
+
+Nexus AI integrates [GitNexus](https://github.com/abhigyanpatwari/GitNexus) for token-efficient code analysis. Instead of reading entire files, agents query a knowledge graph:
+
+```bash
+# Install GitNexus (optional — agents work without it)
+npm install -g gitnexus
+
+# Index your project
+npx gitnexus analyze
+```
+
+When GitNexus is available, agents automatically get 7 additional tools:
+
+| Tool | Purpose |
+|------|---------|
+| `gitnexus_analyze` | Index a repo into a knowledge graph |
+| `gitnexus_query` | Search by concept instead of reading files |
+| `gitnexus_context` | 360° symbol view (callers, callees, flows) |
+| `gitnexus_impact` | Blast radius before editing code |
+| `gitnexus_detect_changes` | Map git diffs to affected symbols |
+| `gitnexus_status` | Check index freshness |
+| `gitnexus_list` | List all indexed repos |
 
 ## Rule-Based Mode
 
