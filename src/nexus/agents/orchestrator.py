@@ -155,13 +155,14 @@ Respond with a JSON object containing:
         if any(
             kw in task_lower
             for kw in [
-                "design", "ux", "prototype", "mockup", "wireframe",
+                "ui design", "ux design", "visual design",
+                "ux", "prototype", "mockup", "wireframe",
                 "visual", "brand", "typography", "color scheme",
                 "landing page design", "infographic",
             ]
         ):
             target = "ux_ui_designer"
-        elif any(kw in task_lower for kw in ["plan", "architect", "break down"]):
+        elif any(kw in task_lower for kw in ["plan", "design", "architect", "break down"]):
             target = "planner"
         elif any(kw in task_lower for kw in ["bug", "fix", "error", "debug"]):
             target = "debugger"

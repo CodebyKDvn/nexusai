@@ -332,7 +332,7 @@ When delivering a design:
             "design_spec": {
                 "philosophy": "To be determined after direction consultation",
                 "colors": ["#0A0A0A", "#FAFAFA", "#3B82F6"],
-                "typography": {"display": "Inter", "body": "system-ui"},
+                "typography": {"display": "Georgia", "body": "system-ui"},
                 "spacing_unit": "8px",
             },
             "review": {

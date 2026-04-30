@@ -41,7 +41,7 @@ For every task, produce a JSON plan:
         {
             "id": 1,
             "description": "Step description",
-            "agent": "developer|debugger|qa|research",
+            "agent": "frontend_developer|backend_developer|ux_ui_designer|debugger|qa|research",
             "dependencies": [],
             "estimated_complexity": "low|medium|high"
         }
@@ -110,7 +110,7 @@ Rules:
                     {
                         "id": 1,
                         "description": task,
-                        "agent": "developer",
+                        "agent": "backend_developer",
                         "dependencies": [],
                         "estimated_complexity": "medium",
                     }
@@ -136,7 +136,7 @@ Rules:
         steps.append({
             "id": step_id,
             "description": "Design the solution architecture",
-            "agent": "developer",
+            "agent": "backend_developer",
             "dependencies": [1],
             "estimated_complexity": "medium",
         })
@@ -145,7 +145,7 @@ Rules:
         steps.append({
             "id": step_id,
             "description": "Implement the solution",
-            "agent": "developer",
+            "agent": "backend_developer",
             "dependencies": [2],
             "estimated_complexity": "high",
         })

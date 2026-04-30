@@ -137,6 +137,8 @@ class TestNvidiaAgentModels:
     def test_no_llm_roles_defined(self) -> None:
         assert "memory" in NO_LLM_ROLES
         assert "tool_executor" in NO_LLM_ROLES
+        assert "lead_developer" in NO_LLM_ROLES
+        assert "developer" in NO_LLM_ROLES
 
 
 class TestLLMInitialization:
@@ -173,6 +175,8 @@ class TestLLMInitialization:
 
         assert "memory" not in team._agent_llms
         assert "tool_executor" not in team._agent_llms
+        assert "lead_developer" not in team._agent_llms
+        assert "developer" not in team._agent_llms
 
     @patch("nexus.team.create_provider")
     def test_fallback_when_specific_model_fails(self, mock_create: MagicMock) -> None:

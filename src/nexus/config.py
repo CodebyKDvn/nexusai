@@ -26,7 +26,10 @@ NVIDIA_AGENT_MODELS: dict[str, str] = {
 }
 
 # Roles that don't use LLM directly — skip LLM initialization for these
-NO_LLM_ROLES: frozenset[str] = frozenset({"memory", "tool_executor"})
+NO_LLM_ROLES: frozenset[str] = frozenset({
+    "memory", "tool_executor",
+    "lead_developer", "developer",  # replaced by frontend/backend_developer
+})
 
 
 @dataclass
