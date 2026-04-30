@@ -88,6 +88,7 @@ class NexusConfig:
                 memory=MemoryConfig(**data.get("memory", {})),
                 sandbox=SandboxConfig(**data.get("sandbox", {})),
                 project_dir=data.get("project_dir", "."),
+                gitnexus=data.get("gitnexus", False),
                 log_level=data.get("log_level", "INFO"),
                 max_iterations=data.get("max_iterations", 20),
             )

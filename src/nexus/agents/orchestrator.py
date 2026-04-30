@@ -30,6 +30,8 @@ class OrchestratorAgent(Agent):
         self._task_queue: list[dict[str, Any]] = []
         self._active_tasks: dict[str, dict[str, Any]] = {}
         self._completed_tasks: list[dict[str, Any]] = []
+        self._review_counts: dict[str, int] = {}
+        self._max_reviews: int = 2
 
         self.bus.subscribe(BROADCAST, self._on_broadcast)
 
@@ -227,6 +229,7 @@ Respond with a JSON object containing:
             # Keep task in _active_tasks so we can recover it after review
             if correlation_id and correlation_id in self._active_tasks:
                 self._active_tasks[correlation_id]["original_content"] = result
+                self._active_tasks[correlation_id]["original_sender"] = message.sender
 
             return self.send(
                 "critic",
@@ -247,13 +250,17 @@ Respond with a JSON object containing:
             self._completed_tasks.append(task_info)
 
         # If this is a review result from critic, check the verdict
-        if message.sender == "critic":
+        if message.sender == "critic" and status == "reviewed":
             verdict = result.get("verdict", "") if isinstance(result, dict) else ""
-            if verdict == "revise":
-                # Re-delegate to the original agent that needed review
-                # We need to find who sent the task for review.
-                # For now, let's look at the context or payload.
-                original_sender = result.get("original_sender", "frontend_developer")
+            cid = correlation_id or ""
+            review_count = self._review_counts.get(cid, 0)
+            if verdict == "revise" and review_count < self._max_reviews:
+                self._review_counts[cid] = review_count + 1
+                original_sender = "frontend_developer"
+                for task in reversed(self._completed_tasks):
+                    if task.get("original_sender"):
+                        original_sender = task["original_sender"]
+                        break
                 return self.send(
                     original_sender,
                     MessageType.TASK_REQUEST,
