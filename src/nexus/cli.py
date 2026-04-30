@@ -218,5 +218,31 @@ def init(ctx: click.Context) -> None:
     click.echo("Nexus AI initialized. Config saved to .nexus/config.yaml")
 
 
+@main.command()
+@click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", "-p", default=8000, type=int, help="Port to listen on")
+@click.option("--reload", is_flag=True, help="Enable auto-reload for development")
+@click.pass_context
+def serve(ctx: click.Context, host: str, port: int, reload: bool) -> None:
+    """Start the web chat interface."""
+    import uvicorn
+
+    config = ctx.obj["config"]
+    click.echo(f"Starting Nexus AI web interface on http://{host}:{port}")
+    click.echo(f"Provider: {config.llm.provider} | Model: {config.llm.model}")
+    if not config.llm.api_key:
+        click.echo("Warning: No API key set — using rule-based mode")
+    click.echo("Press Ctrl+C to stop\n")
+
+    uvicorn.run(
+        "nexus.web.server:create_app",
+        host=host,
+        port=port,
+        reload=reload,
+        factory=True,
+        log_level="info",
+    )
+
+
 if __name__ == "__main__":
     main()

@@ -35,6 +35,8 @@ dependencies = [
     "pyyaml>=6.0",
     "prompt-toolkit>=3.0",
     "textual>=0.80",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -71,7 +73,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["chromadb.*", "tiktoken.*", "textual.*", "prompt_toolkit.*"]
+module = ["chromadb.*", "tiktoken.*", "textual.*", "prompt_toolkit.*", "uvicorn.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
