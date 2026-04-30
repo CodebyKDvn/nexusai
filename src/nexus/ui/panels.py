@@ -32,7 +32,7 @@ class StatusBar:
         table.add_row("Iteration", f"[#a166ab]{iteration}[/]/[dim]{max_iterations}[/dim]")
         table.add_row("Memory", f"[#ff9a9e]{memory_entries}[/]")
 
-        self.console.print(Panel(table, title="[bold #00f2fe]N E X U S[/]", border_style="#a166ab", box=None))
+        self.console.print(Panel(table, title="[bold #00f2fe]N E X U S[/]", border_style="#a166ab"))
 
 
 class AgentPanel:
@@ -64,7 +64,7 @@ class AgentPanel:
         if len(content) > 1000:
             body += "\n[dim]... content truncated ...[/dim]"
 
-        self.console.print(Panel(body, title=header, border_style=style, padding=(0, 2), box=None))
+        self.console.print(Panel(body, title=header, border_style=style, padding=(0, 2)))
 
     def render_plan(self, plan: dict) -> None:  # type: ignore[type-arg]
         table = Table(title="Execution Plan", show_lines=True)

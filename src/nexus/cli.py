@@ -6,13 +6,17 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from nexus.config import NexusConfig
 from nexus.team import NexusTeam
-from nexus.ui.terminal import TerminalUI
 from nexus.ui.app import NexusTerminal
+from nexus.ui.terminal import TerminalUI
+
+if TYPE_CHECKING:
+    from nexus.core.message import Message
 
 
 def setup_logging(verbose: bool) -> None:
@@ -23,18 +27,15 @@ def setup_logging(verbose: bool) -> None:
 
     # Create formatters
     file_formatter = logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
-    
+
     # File handler (all logs)
     file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(file_formatter)
 
-    # Console handler (clean logs)
-    console_level = logging.DEBUG if verbose else logging.INFO
-    
     # Root logger setup
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     root_logger.addHandler(file_handler)
 
     # Suppress noisy logs from libraries
@@ -89,12 +90,12 @@ def _classic_interactive(config: NexusConfig) -> None:
     ui.show_banner()
 
     # Hook into agent messages to display them in the UI
-    def on_message(msg):
+    def on_message(msg: Message) -> None:
         ui.show_agent_message(
             sender=msg.sender,
             recipient=msg.recipient,
             msg_type=msg.type.value,
-            content=str(msg.payload.get("task") or msg.payload.get("result") or msg.payload)
+            content=str(msg.payload.get("task") or msg.payload.get("result") or msg.payload),
         )
 
     team.bus.subscribe("__broadcast__", on_message)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -215,12 +214,6 @@ Respond with a JSON object containing:
         result = message.payload.get("result", "")
         status = message.payload.get("status", "")
 
-        if correlation_id and correlation_id in self._active_tasks:
-            task_info = self._active_tasks.pop(correlation_id)
-            task_info["status"] = status
-            task_info["result"] = result
-            self._completed_tasks.append(task_info)
-
         if self.memory:
             result_str = str(result)[:200] if result else ""
             self.memory.remember(
@@ -231,7 +224,7 @@ Respond with a JSON object containing:
             )
 
         if status == "needs_review":
-            # Store original content in active tasks to recover it after review
+            # Keep task in _active_tasks so we can recover it after review
             if correlation_id and correlation_id in self._active_tasks:
                 self._active_tasks[correlation_id]["original_content"] = result
 
@@ -246,12 +239,19 @@ Respond with a JSON object containing:
                 correlation_id=correlation_id,
             )
 
+        # Pop from active tasks on completion (after review check)
+        if correlation_id and correlation_id in self._active_tasks:
+            task_info = self._active_tasks.pop(correlation_id)
+            task_info["status"] = status
+            task_info["result"] = result
+            self._completed_tasks.append(task_info)
+
         # If this is a review result from critic, check the verdict
         if message.sender == "critic":
             verdict = result.get("verdict", "") if isinstance(result, dict) else ""
             if verdict == "revise":
                 # Re-delegate to the original agent that needed review
-                # We need to find who sent the task for review. 
+                # We need to find who sent the task for review.
                 # For now, let's look at the context or payload.
                 original_sender = result.get("original_sender", "frontend_developer")
                 return self.send(
@@ -268,7 +268,7 @@ Respond with a JSON object containing:
             sender=self.agent_id,
             recipient="user",
             type=MessageType.TASK_RESULT,
-            payload={"status": "complete", "result": final_result},
+            payload={"status": "complete", "result": result},
             correlation_id=correlation_id,
         )
 

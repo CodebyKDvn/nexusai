@@ -20,10 +20,10 @@ from nexus.config import NO_LLM_ROLES, NVIDIA_AGENT_MODELS, NexusConfig
 from nexus.core.loop import AgentLoop
 from nexus.core.message import Message, MessageBus, MessageType
 from nexus.core.registry import AgentRegistry
+from nexus.core.repo import RepoIntelligence
 from nexus.llm.provider import LLMProvider, create_provider
 from nexus.memory.manager import MemoryManager
 from nexus.tools import create_default_registry
-from nexus.core.repo import RepoIntelligence
 
 logger = logging.getLogger(__name__)
 

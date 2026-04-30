@@ -51,7 +51,7 @@ class LLMConfig:
             self.api_key = os.environ.get(env_key, "")
 
 
-@dataclass  
+@dataclass
 class MemoryConfig:
     persist_dir: str = ".nexus/memory"
     short_term_capacity: int = 50

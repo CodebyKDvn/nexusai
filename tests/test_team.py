@@ -124,9 +124,9 @@ class TestNvidiaAgentModels:
     """Tests for NVIDIA_AGENT_MODELS configuration correctness."""
 
     def test_model_names_spelling(self) -> None:
-        assert NVIDIA_AGENT_MODELS["orchestrator"] == "moonshotai/kimi-k2.5"
+        assert NVIDIA_AGENT_MODELS["orchestrator"] == "moonshotai/kimi-k2-instruct"
         assert NVIDIA_AGENT_MODELS["planner"] == "z-ai/glm-5.1"
-        assert NVIDIA_AGENT_MODELS["ux_ui_designer"] == "moonshotai/kimi-k2.5"
+        assert NVIDIA_AGENT_MODELS["ux_ui_designer"] == "moonshotai/kimi-k2-instruct"
 
     def test_lead_developer_and_developer_present(self) -> None:
         assert "lead_developer" in NVIDIA_AGENT_MODELS
@@ -186,8 +186,8 @@ class TestLLMInitialization:
         def side_effect(provider: str, api_key: str, model: str) -> MagicMock | None:
             nonlocal call_count
             call_count += 1
-            # Fail for the first model (orchestrator's kimi-k2.5), succeed for default
-            if model == "moonshotai/kimi-k2.5":
+            # Fail for the first model (orchestrator's kimi-k2-instruct), succeed for default
+            if model == "moonshotai/kimi-k2-instruct":
                 raise RuntimeError("Model unavailable")
             return MagicMock()
 

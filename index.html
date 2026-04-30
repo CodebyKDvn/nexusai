@@ -349,7 +349,7 @@
                     li.setAttribute('data-id', task.id);
                     li.innerHTML = `
                         <div class="checkbox" onclick="toggleTask('${task.id}')"></div>
-                        <span class="todo-text" onclick="toggleTask('${task.id}')">${task.text}</span>
+                        <span class="todo-text" onclick="toggleTask('${task.id}')">${task.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}</span>
                         <button class="delete-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')">✕</button>
                     `;
                     todoList.appendChild(li);

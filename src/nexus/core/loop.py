@@ -10,8 +10,8 @@ from nexus.core.message import Message, MessageType
 
 if TYPE_CHECKING:
     from nexus.core.agent import Agent
-    from nexus.core.registry import AgentRegistry
     from nexus.core.message import MessageBus
+    from nexus.core.registry import AgentRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class AgentLoop:
                     continue
 
                 # Publish to bus so UI/observability can see it
-                if self.bus:
+                if self.bus and not response.published:
                     self.bus.publish(response)
 
                 self._state.results.append(response.to_dict())
