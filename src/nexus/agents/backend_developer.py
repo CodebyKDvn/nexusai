@@ -128,9 +128,8 @@ When you have a solution ready:
         for _iteration in range(max_iterations):
             response = self.llm.chat(messages)
 
-            try:
-                decision: dict[str, Any] = json.loads(response.content)
-            except json.JSONDecodeError:
+            decision = self.parse_json(response.content)
+            if decision is None:
                 return {"action": "complete", "summary": response.content, "files": []}
 
             if decision.get("action") == "use_tool" and self.tools:

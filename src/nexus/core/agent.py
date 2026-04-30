@@ -106,5 +106,23 @@ class Agent(ABC):
         self._context.clear()
         self._iteration_count = 0
 
+    def parse_json(self, content: str) -> dict[str, Any] | None:
+        """Safely parse JSON from LLM response, handling markdown code blocks."""
+        content = content.strip()
+        if content.startswith("```"):
+            # Strip code blocks
+            lines = content.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            content = "\n".join(lines).strip()
+
+        try:
+            import json
+            return json.loads(content) # type: ignore[no-any-return]
+        except json.JSONDecodeError:
+            return None
+
     def __repr__(self) -> str:
         return f"Agent({self.agent_id}, role={self.role.value})"

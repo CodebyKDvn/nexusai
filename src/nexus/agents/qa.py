@@ -91,9 +91,8 @@ Respond with:
 
         for _ in range(3):
             response = self.llm.chat(messages)
-            try:
-                decision: dict[str, Any] = json.loads(response.content)
-            except json.JSONDecodeError:
+            decision = self.parse_json(response.content)
+            if decision is None:
                 return {"results": {"summary": response.content}}
 
             if decision.get("action") == "write_tests" and self.tools:

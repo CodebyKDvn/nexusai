@@ -114,9 +114,8 @@ Respond with a JSON object containing:
         ]
         response = self.llm.chat(messages)
 
-        try:
-            decision = json.loads(response.content)
-        except json.JSONDecodeError:
+        decision = self.parse_json(response.content)
+        if decision is None:
             decision = {"action": "respond", "response": response.content}
 
         action = decision.get("action", "respond")
@@ -232,6 +231,10 @@ Respond with a JSON object containing:
             )
 
         if status == "needs_review":
+            # Store original content in active tasks to recover it after review
+            if correlation_id and correlation_id in self._active_tasks:
+                self._active_tasks[correlation_id]["original_content"] = result
+
             return self.send(
                 "critic",
                 MessageType.TASK_REQUEST,
@@ -243,11 +246,29 @@ Respond with a JSON object containing:
                 correlation_id=correlation_id,
             )
 
+        # If this is a review result from critic, check the verdict
+        if message.sender == "critic":
+            verdict = result.get("verdict", "") if isinstance(result, dict) else ""
+            if verdict == "revise":
+                # Re-delegate to the original agent that needed review
+                # We need to find who sent the task for review. 
+                # For now, let's look at the context or payload.
+                original_sender = result.get("original_sender", "frontend_developer")
+                return self.send(
+                    original_sender,
+                    MessageType.TASK_REQUEST,
+                    {
+                        "task": f"Please revise your work based on critic feedback: {result.get('raw_feedback', '')}",
+                        "context": f"Previous attempt was rejected by critic with score {result.get('overall_score')}",
+                    },
+                    correlation_id=correlation_id,
+                )
+
         return Message(
             sender=self.agent_id,
             recipient="user",
             type=MessageType.TASK_RESULT,
-            payload={"status": "complete", "result": result},
+            payload={"status": "complete", "result": final_result},
             correlation_id=correlation_id,
         )
 

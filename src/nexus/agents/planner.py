@@ -100,10 +100,10 @@ Rules:
         ]
         response = self.llm.chat(messages)
 
-        try:
-            result: dict[str, Any] = json.loads(response.content)
+        result = self.parse_json(response.content)
+        if result is not None:
             return result
-        except json.JSONDecodeError:
+        else:
             return {
                 "goal": task,
                 "steps": [

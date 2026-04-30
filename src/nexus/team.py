@@ -23,6 +23,7 @@ from nexus.core.registry import AgentRegistry
 from nexus.llm.provider import LLMProvider, create_provider
 from nexus.memory.manager import MemoryManager
 from nexus.tools import create_default_registry
+from nexus.core.repo import RepoIntelligence
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +194,17 @@ class NexusTeam:
             category="user_input",
         )
 
+        # Inject GitNexus context if available
+        if self.config.gitnexus:
+            repo_intel = RepoIntelligence(self.config.project_dir)
+            context = repo_intel.get_context()
+            if context:
+                logger.info("Loading GitNexus project intelligence...")
+                self.memory.remember(
+                    context,
+                    category="project_intelligence"
+                )
+
         initial_message = Message(
             sender="user",
             recipient="orchestrator",
@@ -200,7 +212,7 @@ class NexusTeam:
             payload={"task": user_request},
         )
 
-        loop = AgentLoop(self.registry, max_iterations=self.config.max_iterations)
+        loop = AgentLoop(self.registry, bus=self.bus, max_iterations=self.config.max_iterations)
         state = loop.run(initial_message)
 
         result: dict[str, Any] = {

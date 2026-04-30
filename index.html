@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Huashu Todo — Gentle Focus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #F8F6F3;
+            --surface: #FFFFFF;
+            --primary: #A8D5BA;
+            --secondary: #F4B8C5;
+            --tertiary: #B8D4E8;
+            --text-primary: #2D3436;
+            --text-secondary: #7F8C8D;
+            --text-muted: #BDC3C7;
+            --danger: #E17055;
+            --shadow: rgba(45, 52, 54, 0.08);
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Nunito', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 80px 20px;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background Orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .orb-1 { width: 300px; height: 300px; background: var(--primary); top: -100px; left: -100px; }
+        .orb-2 { width: 400px; height: 400px; background: var(--secondary); bottom: -150px; right: -150px; }
+        .orb-3 { width: 250px; height: 250px; background: var(--tertiary); top: 20%; right: 10%; }
+
+        main {
+            width: 100%;
+            max-width: 520px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        header {
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 16px;
+            font-style: italic;
+        }
+
+        /* Input Section */
+        .input-group {
+            background: var(--surface);
+            padding: 8px;
+            border-radius: 20px;
+            display: flex;
+            gap: 8px;
+            box-shadow: 0 10px 30px var(--shadow);
+            margin-bottom: 24px;
+            border: 1px solid rgba(0,0,0,0.02);
+            transition: var(--transition);
+        }
+
+        .input-group:focus-within {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px var(--shadow);
+            border-color: var(--primary);
+        }
+
+        input {
+            flex: 1;
+            border: none;
+            padding: 12px 16px;
+            font-size: 16px;
+            outline: none;
+            background: transparent;
+        }
+
+        input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .add-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            font-size: 28px;
+            transition: var(--transition);
+        }
+
+        .add-btn:hover {
+            transform: scale(1.05) rotate(90deg);
+            background-color: #94c4a6;
+        }
+
+        /* List Section */
+        .todo-list {
+            list-style: none;
+        }
+
+        .todo-item {
+            background: var(--surface);
+            margin-bottom: 12px;
+            padding: 16px 20px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 4px 15px var(--shadow);
+            transition: var(--transition);
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .todo-item:hover {
+            transform: scale(1.01);
+            box-shadow: 0 8px 25px var(--shadow);
+        }
+
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+
+        .todo-item.completed .checkbox {
+            background-color: var(--primary);
+        }
+
+        .checkbox::after {
+            content: '✓';
+            color: white;
+            font-size: 14px;
+            display: none;
+        }
+
+        .todo-item.completed .checkbox::after {
+            display: block;
+        }
+
+        .todo-text {
+            flex: 1;
+            font-size: 16px;
+            transition: var(--transition);
+        }
+
+        .todo-item.completed .todo-text {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 8px;
+            font-size: 18px;
+            transition: var(--transition);
+            opacity: 0;
+        }
+
+        .todo-item:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .delete-btn:hover {
+            color: var(--danger);
+            transform: scale(1.1);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 32px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 120px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            body { padding: 40px 16px; }
+            header h1 { font-size: 28px; }
+            .todo-item { padding: 12px 16px; }
+            .delete-btn { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <main>
+        <header>
+            <h1>🌿 Huashu Todo</h1>
+            <p>"Một không gian dịu dàng cho sự tập trung"</p>
+        </header>
+
+        <div class="input-group">
+            <input type="text" id="todo-input" placeholder="Thêm một nhiệm vụ mới..." autocomplete="off">
+            <button class="add-btn" id="add-btn">+</button>
+        </div>
+
+        <ul class="todo-list" id="todo-list">
+            <!-- Items will be injected here -->
+        </ul>
+
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/>
+                <path d="M12 16V12M12 8H12.01"/>
+            </svg>
+            <p>Chưa có nhiệm vụ nào. Hãy bắt đầu một điều mới!</p>
+        </div>
+
+        <footer id="footer-stats">
+            <!-- Stats will be injected here -->
+        </footer>
+    </main>
+
+    <script>
+        const todoInput = document.getElementById('todo-input');
+        const addBtn = document.getElementById('add-btn');
+        const todoList = document.getElementById('todo-list');
+        const emptyState = document.getElementById('empty-state');
+        const footerStats = document.getElementById('footer-stats');
+
+        let tasks = JSON.parse(localStorage.getItem('huashu_tasks')) || [];
+
+        function saveTasks() {
+            localStorage.setItem('huashu_tasks', JSON.stringify(tasks));
+            render();
+        }
+
+        function addTask() {
+            const text = todoInput.value.trim();
+            if (text) {
+                tasks.unshift({
+                    id: crypto.randomUUID(),
+                    text: text,
+                    completed: false,
+                    createdAt: Date.now()
+                });
+                todoInput.value = '';
+                saveTasks();
+            }
+        }
+
+        function toggleTask(id) {
+            tasks = tasks.map(task => 
+                task.id === id ? { ...task, completed: !task.completed } : task
+            );
+            saveTasks();
+        }
+
+        function deleteTask(id) {
+            const el = document.querySelector(`[data-id="${id}"]`);
+            el.style.transform = "translateX(50px)";
+            el.style.opacity = "0";
+            setTimeout(() => {
+                tasks = tasks.filter(task => task.id !== id);
+                saveTasks();
+            }, 300);
+        }
+
+        function render() {
+            todoList.innerHTML = '';
+            
+            if (tasks.length === 0) {
+                emptyState.style.display = 'block';
+                footerStats.style.display = 'none';
+            } else {
+                emptyState.style.display = 'none';
+                footerStats.style.display = 'block';
+                
+                const completedCount = tasks.filter(t => t.completed).length;
+                footerStats.textContent = `${tasks.length} nhiệm vụ · ${completedCount} đã hoàn thành`;
+
+                tasks.forEach(task => {
+                    const li = document.createElement('li');
+                    li.className = `todo-item ${task.completed ? 'completed' : ''}`;
+                    li.setAttribute('data-id', task.id);
+                    li.innerHTML = `
+                        <div class="checkbox" onclick="toggleTask('${task.id}')"></div>
+                        <span class="todo-text" onclick="toggleTask('${task.id}')">${task.text}</span>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')">✕</button>
+                    `;
+                    todoList.appendChild(li);
+                });
+            }
+        }
+
+        addBtn.addEventListener('click', addTask);
+        todoInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask();
+        });
+
+        render();
+    </script>
+</body>
+</html>

@@ -10,18 +10,18 @@ import yaml
 
 # NVIDIA NIM model assignments per agent role
 NVIDIA_AGENT_MODELS: dict[str, str] = {
-    "orchestrator": "moonshotai/kimi-k2.5",
+    "orchestrator": "moonshotai/kimi-k2-instruct",
     "planner": "z-ai/glm-5.1",
     "lead_developer": "deepseek-ai/deepseek-v4-pro",
     "developer": "deepseek-ai/deepseek-v4-flash",
     "frontend_developer": "minimaxai/minimax-m2.7",
     "backend_developer": "deepseek-ai/deepseek-v4-pro",
-    "ux_ui_designer": "moonshotai/kimi-k2.5",
+    "ux_ui_designer": "moonshotai/kimi-k2-instruct",
     "debugger": "deepseek-ai/deepseek-v4-flash",
     "qa": "google/gemma-4-31b-it",
     "research": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
     "memory": "qwen/qwen3.5-397b-a17b",
-    "critic": "deepseek-ai/deepseek-v3.2",
+    "critic": "deepseek-ai/deepseek-v4-flash",
     "tool_executor": "mistralai/mistral-nemotron",
 }
 
@@ -51,7 +51,7 @@ class LLMConfig:
             self.api_key = os.environ.get(env_key, "")
 
 
-@dataclass
+@dataclass  
 class MemoryConfig:
     persist_dir: str = ".nexus/memory"
     short_term_capacity: int = 50
@@ -71,6 +71,7 @@ class NexusConfig:
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     sandbox: SandboxConfig = field(default_factory=SandboxConfig)
     project_dir: str = "."
+    gitnexus: bool = False
     log_level: str = "INFO"
     max_iterations: int = 20
 
@@ -113,6 +114,7 @@ class NexusConfig:
                 "timeout_seconds": self.sandbox.timeout_seconds,
             },
             "project_dir": self.project_dir,
+            "gitnexus": self.gitnexus,
             "log_level": self.log_level,
             "max_iterations": self.max_iterations,
         }
