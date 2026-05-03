@@ -234,14 +234,67 @@ def serve(ctx: click.Context, host: str, port: int, reload: bool) -> None:
         click.echo("Warning: No API key set — using rule-based mode")
     click.echo("Press Ctrl+C to stop\n")
 
-    uvicorn.run(
-        "nexus.web.server:create_app",
-        host=host,
-        port=port,
-        reload=reload,
-        factory=True,
-        log_level="info",
-    )
+    if reload:
+        # Reload mode requires string import path; config from file/env only
+        uvicorn.run(
+            "nexus.web.server:create_app",
+            host=host,
+            port=port,
+            reload=True,
+            factory=True,
+            log_level="info",
+        )
+    else:
+        # Non-reload: pass the pre-configured app so CLI overrides are kept
+        from nexus.web.server import create_app
+
+        app = create_app(config)
+        uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+@main.command()
+@click.option("--host", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", default=9090, type=int, help="Port to listen on")
+@click.pass_context
+def mcp(ctx: click.Context, host: str, port: int) -> None:
+    """Start the MCP tool server (Nexus Skill-Core)."""
+    import uvicorn
+
+    from nexus.mcp import MCPServer
+
+    server = MCPServer()
+    tools = server.store.list_tools()
+    click.echo(f"Starting Nexus Skill-Core MCP Server on http://{host}:{port}")
+    click.echo(f"Registered tools: {len(tools)}")
+    for tool in tools:
+        click.echo(f"  - {tool.name} ({tool.category}): {tool.source}")
+    nvidia_ok = server.store.nvidia_wrapper.is_configured
+    click.echo(f"NVIDIA NIM: {'configured' if nvidia_ok else 'not configured (code tools disabled)'}")
+    click.echo("Press Ctrl+C to stop\n")
+
+    app = server.create_app()
+    uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+@main.command(name="mcp-tools")
+@click.option("--category", "-c", default=None, help="Filter by category")
+@click.option("--source", "-s", default=None, help="Filter by source (claude/gemini/codex)")
+def mcp_tools(category: str | None, source: str | None) -> None:
+    """List all available MCP tools."""
+    from nexus.mcp.tools import ALL_MCP_TOOLS
+
+    tools = ALL_MCP_TOOLS
+    if category:
+        tools = [t for t in tools if t.category == category]
+    if source:
+        tools = [t for t in tools if source in t.source]
+
+    click.echo(f"MCP Tools ({len(tools)}):\n")
+    for tool in sorted(tools, key=lambda t: (t.category, t.name)):
+        click.echo(f"  [{tool.category}] {tool.name}")
+        click.echo(f"    Source: {tool.source}")
+        click.echo(f"    {tool.description.split('.')[0]}.")
+        click.echo()
 
 
 if __name__ == "__main__":

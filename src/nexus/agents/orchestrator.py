@@ -285,8 +285,8 @@ Respond with a JSON object containing:
                     original_sender,
                     MessageType.TASK_REQUEST,
                     {
-                        "task": f"Please revise your work based on critic feedback: {result.get('raw_feedback', '')}",
-                        "context": f"Previous attempt was rejected by critic with score {result.get('overall_score')}",
+                        "task": f"Please revise your work based on critic feedback: {result.get('raw_feedback', '') or ', '.join(result.get('improvements', []))}",
+                        "context": f"Previous attempt was rejected by critic with score {result.get('overall_score')}. Improvements needed: {result.get('improvements', [])}",
                     },
                     correlation_id=correlation_id,
                 )

@@ -33,6 +33,7 @@ dependencies = [
     "tiktoken>=0.7",
     "tenacity>=8.3",
     "pyyaml>=6.0",
+    "duckduckgo_search>=6.0",
     "prompt-toolkit>=3.0",
     "textual>=0.80",
     "fastapi>=0.111",
@@ -73,7 +74,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["chromadb.*", "tiktoken.*", "textual.*", "prompt_toolkit.*", "uvicorn.*"]
+module = ["chromadb.*", "tiktoken.*", "textual.*", "prompt_toolkit.*", "uvicorn.*", "duckduckgo_search.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
