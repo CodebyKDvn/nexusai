@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from nexus.core.agent import Agent, AgentId, AgentRole
@@ -152,52 +153,61 @@ Respond with a JSON object containing:
                 },
             )
 
+    @staticmethod
+    def _matches(task_lower: str, keywords: list[str]) -> bool:
+        """Check if any keyword matches as a whole word in the task."""
+        return any(
+            re.search(r'\b' + re.escape(kw) + r'\b', task_lower)
+            for kw in keywords
+        )
+
     def _delegate_rule_based(
         self, message: Message, task: str, correlation_id: str
     ) -> Message | None:
         task_lower = task.lower()
+        m = self._matches
 
-        if any(
-            kw in task_lower
-            for kw in [
+        if m(
+            task_lower,
+            [
                 "ui design", "ux design", "visual design",
                 "ux", "prototype", "mockup", "wireframe",
                 "visual", "brand", "typography", "color scheme",
                 "landing page design", "infographic",
-            ]
+            ],
         ):
             target = "ux_ui_designer"
-        elif any(kw in task_lower for kw in ["plan", "design", "architect", "break down"]):
+        elif m(task_lower, ["plan", "design", "architect", "break down"]):
             target = "planner"
-        elif any(kw in task_lower for kw in ["bug", "fix", "error", "debug"]):
+        elif m(task_lower, ["bug", "fix", "error", "debug"]):
             target = "debugger"
-        elif any(kw in task_lower for kw in ["test", "verify", "validate", "qa"]):
+        elif m(task_lower, ["test", "verify", "validate", "qa"]):
             target = "qa"
-        elif any(
-            kw in task_lower
-            for kw in [
+        elif m(
+            task_lower,
+            [
                 "search", "find", "look up", "research", "docs",
                 "analyze codebase", "code intelligence", "knowledge graph",
                 "index repo", "blast radius", "impact analysis",
-            ]
+            ],
         ):
             target = "research"
-        elif any(kw in task_lower for kw in ["review", "evaluate", "critique", "improve"]):
+        elif m(task_lower, ["review", "evaluate", "critique", "improve"]):
             target = "critic"
-        elif any(
-            kw in task_lower
-            for kw in [
+        elif m(
+            task_lower,
+            [
                 "frontend", "ui", "component", "css", "html", "react",
                 "vue", "angular", "layout", "style", "responsive",
-            ]
+            ],
         ):
             target = "frontend_developer"
-        elif any(
-            kw in task_lower
-            for kw in [
+        elif m(
+            task_lower,
+            [
                 "backend", "api", "database", "server", "endpoint",
                 "rest", "graphql", "auth", "migration",
-            ]
+            ],
         ):
             target = "backend_developer"
         else:
@@ -263,6 +273,14 @@ Respond with a JSON object containing:
             if verdict == "revise" and review_count < self._max_reviews:
                 self._review_counts[cid] = review_count + 1
                 original_sender = task_info.get("original_sender", "planner") if task_info else "planner"
+                # Re-add task so the next review cycle can find original_sender
+                if correlation_id:
+                    self._active_tasks[correlation_id] = {
+                        "task": task_info.get("task", "") if task_info else "",
+                        "target": original_sender,
+                        "status": "revising",
+                        "original_sender": original_sender,
+                    }
                 return self.send(
                     original_sender,
                     MessageType.TASK_REQUEST,
