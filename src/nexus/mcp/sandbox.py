@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -66,13 +67,14 @@ class Sandbox:
             SandboxError: If the command is blocked.
         """
         cmd_lower = command.lower().strip()
+        cmd_normalized = re.sub(r"\s+", " ", cmd_lower)
 
         for blocked in BLOCKED_COMMANDS:
-            if blocked in cmd_lower:
+            if blocked in cmd_normalized:
                 raise SandboxError(f"Blocked command: {command}")
 
         for pattern in DANGEROUS_PATTERNS:
-            if pattern in cmd_lower:
+            if pattern in cmd_normalized:
                 raise SandboxError(
                     f"Potentially dangerous command detected: {command}"
                 )

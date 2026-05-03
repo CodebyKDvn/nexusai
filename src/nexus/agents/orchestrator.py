@@ -290,6 +290,15 @@ Respond with a JSON object containing:
                     },
                     correlation_id=correlation_id,
                 )
+            # Critic approved — return the developer's original output
+            original_content = task_info.get("original_content", result) if task_info else result
+            return Message(
+                sender=self.agent_id,
+                recipient="user",
+                type=MessageType.TASK_RESULT,
+                payload={"status": "complete", "result": original_content},
+                correlation_id=correlation_id,
+            )
 
         return Message(
             sender=self.agent_id,

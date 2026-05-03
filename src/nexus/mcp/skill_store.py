@@ -10,7 +10,7 @@ from typing import Any
 
 from nexus.mcp.base import MCPTool, MCPToolCategory, MCPToolParam, MCPToolResult
 from nexus.mcp.nvidia_wrapper import NvidiaToolWrapper
-from nexus.mcp.sandbox import Sandbox
+from nexus.mcp.sandbox import Sandbox, SandboxError
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class SkillStore:
 
             count = 0
             for entry in data:
-                tool = _json_to_tool(entry)
+                tool = _json_to_tool(entry, sandbox=self._sandbox)
                 if tool:
                     self.register(tool)
                     count += 1
@@ -170,7 +170,7 @@ class SkillStore:
 
             count = 0
             for entry in data:
-                tool = _json_to_tool(entry)
+                tool = _json_to_tool(entry, sandbox=self._sandbox)
                 if tool:
                     self.register(tool)
                     count += 1
@@ -212,7 +212,7 @@ class SkillStore:
         return "\n".join(lines)
 
 
-def _json_to_tool(entry: dict[str, Any]) -> MCPTool | None:
+def _json_to_tool(entry: dict[str, Any], sandbox: Sandbox | None = None) -> MCPTool | None:
     """Convert a JSON tool definition to a DynamicMCPTool."""
     required_fields = ["name", "description"]
     for f in required_fields:
@@ -245,6 +245,7 @@ def _json_to_tool(entry: dict[str, Any]) -> MCPTool | None:
         source=entry.get("source", "custom"),
         parameters=params,
         command_template=entry.get("command_template", ""),
+        sandbox=sandbox,
     )
 
 
@@ -259,6 +260,7 @@ class _DynamicMCPTool(MCPTool):
         source: str,
         parameters: list[Any],
         command_template: str,
+        sandbox: Sandbox | None = None,
     ) -> None:
         self.name = name
         self.description = description
@@ -266,6 +268,7 @@ class _DynamicMCPTool(MCPTool):
         self.source = source
         self.parameters = parameters
         self._command_template = command_template
+        self._sandbox = sandbox
 
     def execute(self, **params: Any) -> MCPToolResult:
         if not self._command_template:
@@ -273,24 +276,35 @@ class _DynamicMCPTool(MCPTool):
                 f"Tool {self.name} has no command_template defined"
             )
 
-        import subprocess
+        import shlex
 
         command = self._command_template
         for key, value in params.items():
-            command = command.replace(f"{{{key}}}", str(value))
+            command = command.replace(f"{{{key}}}", shlex.quote(str(value)))
+
+        if self._sandbox:
+            try:
+                sandbox_result = self._sandbox.execute(command)
+                return MCPToolResult.text(sandbox_result.get("stdout", "") or "(no output)")
+            except SandboxError as e:
+                return MCPToolResult.error(str(e))
+            except Exception as e:
+                return MCPToolResult.error(str(e))
+
+        import subprocess
 
         try:
-            result = subprocess.run(
+            proc = subprocess.run(
                 command,
                 shell=True,
                 capture_output=True,
                 text=True,
                 timeout=30,
             )
-            output = result.stdout.strip()
-            if result.stderr.strip():
-                output += f"\n{result.stderr.strip()}"
-            if result.returncode != 0:
+            output = proc.stdout.strip()
+            if proc.stderr.strip():
+                output += f"\n{proc.stderr.strip()}"
+            if proc.returncode != 0:
                 return MCPToolResult.error(output or f"Command failed: {command}")
             return MCPToolResult.text(output or "(no output)")
         except Exception as e:
