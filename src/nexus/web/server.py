@@ -84,6 +84,23 @@ def create_app(config: NexusConfig | None = None) -> FastAPI:
             "has_api_key": bool(cfg.llm.api_key),
         }
 
+    @app.get("/api/crew")
+    async def crew_analyze(task: str = "") -> dict[str, Any]:
+        if not task:
+            return {"error": "Provide a 'task' query parameter"}
+        assignment = team.crew_assembler.assemble(task)
+        return {
+            "category": assignment.category.value,
+            "agents": assignment.agents,
+            "parallel": assignment.parallel,
+            "confidence": assignment.confidence,
+            "reasoning": assignment.reasoning,
+        }
+
+    @app.get("/api/task-graph")
+    async def task_graph_status() -> dict[str, Any]:
+        return team.task_graph.summary()
+
     @app.get("/api/memory")
     async def memory(query: str = "") -> dict[str, Any]:
         if query:

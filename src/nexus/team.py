@@ -17,10 +17,13 @@ from nexus.agents.research import ResearchAgent
 from nexus.agents.tool_executor import ToolExecutorAgent
 from nexus.agents.ux_ui_designer import UxUiDesignerAgent
 from nexus.config import NO_LLM_ROLES, NVIDIA_AGENT_MODELS, NexusConfig
+from nexus.core.crew import CrewAssembler
 from nexus.core.loop import AgentLoop
 from nexus.core.message import Message, MessageBus, MessageType
 from nexus.core.registry import AgentRegistry
 from nexus.core.repo import RepoIntelligence
+from nexus.core.state import CheckpointManager, TaskGraph
+from nexus.core.workflow import WorkflowEngine, WorkflowGraph
 from nexus.llm.provider import LLMProvider, create_provider
 from nexus.memory.manager import MemoryManager
 from nexus.tools import create_default_registry
@@ -43,8 +46,21 @@ class NexusTeam:
         self._agent_llms: dict[str, LLMProvider] = {}
         self._results: list[dict[str, Any]] = []
 
+        # Orchestration upgrades
+        self.checkpoint_mgr = CheckpointManager(
+            state_dir=self.config.project_dir + "/.nexus_state",
+        )
+        self.task_graph = TaskGraph(self.checkpoint_mgr)
+        self.crew_assembler = CrewAssembler()
+        self.workflow_graph = WorkflowGraph.create_default()
+
         self._init_llms()
         self._init_agents()
+
+        # Set available agents for crew assembler
+        self.crew_assembler.set_available_agents(
+            [a.agent_id for a in self.registry.all_agents()]
+        )
 
     def _create_llm(self, model: str) -> LLMProvider | None:
         """Create a provider instance for a specific model."""
@@ -205,11 +221,28 @@ class NexusTeam:
                     category="project_intelligence"
                 )
 
+        # Analyze crew requirements
+        crew = self.crew_assembler.assemble(user_request)
+        logger.info(
+            "Crew assembled: category=%s, agents=%s, parallel=%s",
+            crew.category.value,
+            crew.agents,
+            crew.parallel,
+        )
+
         initial_message = Message(
             sender="user",
             recipient="orchestrator",
             type=MessageType.TASK_REQUEST,
-            payload={"task": user_request},
+            payload={
+                "task": user_request,
+                "crew": {
+                    "category": crew.category.value,
+                    "agents": crew.agents,
+                    "parallel": crew.parallel,
+                    "reasoning": crew.reasoning,
+                },
+            },
         )
 
         loop = AgentLoop(self.registry, bus=self.bus, max_iterations=self.config.max_iterations)
@@ -220,6 +253,11 @@ class NexusTeam:
             "iterations": state.iteration,
             "results": state.results,
             "errors": state.errors,
+            "crew": {
+                "category": crew.category.value,
+                "agents": crew.agents,
+            },
+            "task_graph": self.task_graph.summary(),
         }
 
         final_output = ""
@@ -236,6 +274,52 @@ class NexusTeam:
         result["output"] = final_output or "Task completed."
         self._results.append(result)
 
+        return result
+
+    def run_workflow(self, user_request: str) -> dict[str, Any]:
+        """Process a complex request using the full workflow engine.
+
+        Use this for multi-phase tasks (plan→design→code→test→review).
+        For simpler tasks, ``run()`` with the linear loop is sufficient.
+        """
+        logger.info("Workflow request: %s", user_request[:100])
+
+        self.memory.remember(
+            f"Workflow request: {user_request}",
+            category="user_input",
+        )
+
+        engine = WorkflowEngine(
+            registry=self.registry,
+            graph=self.workflow_graph,
+            task_graph=self.task_graph,
+            max_iterations=self.config.max_iterations,
+        )
+        wf_state = engine.run(user_request)
+        summary = engine.get_phase_summary()
+
+        # Collect output from the last successful phase
+        final_output = ""
+        for phase_name in reversed(wf_state.completed_phases):
+            phase_data = wf_state.phase_results.get(phase_name, {})
+            outputs = phase_data.get("outputs", [])
+            for out in reversed(outputs):
+                result_val = out.get("result", "")
+                if result_val:
+                    final_output = str(result_val)[:2000]
+                    break
+            if final_output:
+                break
+
+        result: dict[str, Any] = {
+            "completed": wf_state.completed,
+            "iterations": wf_state.iteration,
+            "phases": summary["phases"],
+            "errors": wf_state.errors,
+            "output": final_output or "Workflow completed.",
+            "task_graph": self.task_graph.summary(),
+        }
+        self._results.append(result)
         return result
 
     @property
