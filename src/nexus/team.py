@@ -18,8 +18,12 @@ from nexus.agents.tool_executor import ToolExecutorAgent
 from nexus.agents.ux_ui_designer import UxUiDesignerAgent
 from nexus.config import NO_LLM_ROLES, NVIDIA_AGENT_MODELS, NexusConfig
 from nexus.core.crew import CrewAssembler
+from nexus.core.evaluation import SelfEvaluator
+from nexus.core.hitl import ApprovalGateManager
 from nexus.core.loop import AgentLoop
 from nexus.core.message import Message, MessageBus, MessageType
+from nexus.core.observability import SpanKind, Tracer
+from nexus.core.recovery import RecoveryManager
 from nexus.core.registry import AgentRegistry
 from nexus.core.repo import RepoIntelligence
 from nexus.core.state import CheckpointManager, TaskGraph
@@ -54,8 +58,17 @@ class NexusTeam:
         self.crew_assembler = CrewAssembler()
         self.workflow_graph = WorkflowGraph.create_default()
 
+        # Reliability & Production-grade (Group 2)
+        self.approval_gates = ApprovalGateManager(auto_approve=False)
+        self.evaluator = SelfEvaluator()
+        self.tracer = Tracer()
+        self.recovery: RecoveryManager | None = None  # set after registry init
+
         self._init_llms()
         self._init_agents()
+
+        # Recovery manager needs registry
+        self.recovery = RecoveryManager(self.registry)
 
         # Set available agents for crew assembler
         self.crew_assembler.set_available_agents(
@@ -205,6 +218,10 @@ class NexusTeam:
         """Process a user request through the agent team."""
         logger.info("Processing request: %s", user_request[:100])
 
+        # Start tracing
+        trace = self.tracer.start_trace(user_request)
+        span = self.tracer.start_span(trace, SpanKind.AGENT_CALL, "team.run")
+
         self.memory.remember(
             f"User request: {user_request}",
             category="user_input",
@@ -272,8 +289,25 @@ class NexusTeam:
                 break
 
         result["output"] = final_output or "Task completed."
-        self._results.append(result)
 
+        # Self-evaluation
+        eval_result = self.evaluator.evaluate_output(
+            output=final_output or "",
+            task_description=user_request,
+            agent_id="team",
+        )
+        result["evaluation"] = {
+            "score": eval_result.overall_score,
+            "passed": eval_result.passed,
+            "feedback": eval_result.feedback,
+        }
+
+        # Finish tracing
+        self.tracer.finish_span(span, status="ok" if state.completed else "error")
+        self.tracer.finish_trace(trace, status="ok" if state.completed else "error")
+        result["trace_id"] = trace.trace_id
+
+        self._results.append(result)
         return result
 
     def run_workflow(self, user_request: str) -> dict[str, Any]:

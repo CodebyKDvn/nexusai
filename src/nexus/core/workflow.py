@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 import uuid
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -433,12 +434,25 @@ class WorkflowEngine:
                         return WorkflowPhase.CODE
             return None  # Approved or max reviews reached
 
-        # Skip design phase if task doesn't need it
+        # Route from PLAN: go to DESIGN only if the task needs it
         if current == WorkflowPhase.PLAN and len(successors) > 1:
-            # Check if design is optional and task doesn't need it
             design_node = self.graph.get_node(WorkflowPhase.DESIGN)
             if design_node and not design_node.required and WorkflowPhase.CODE in successors:
-                return WorkflowPhase.CODE
+                # Check accumulated context / task for design-related signals
+                task_text = ""
+                for output in phase_result.outputs:
+                    task_text += str(output.get("result", ""))
+                task_text = task_text.lower()
+                design_keywords = [
+                    r"\bdesign\b", r"\bui\b", r"\bux\b", r"\bwireframe\b",
+                    r"\bmockup\b", r"\bprototype\b", r"\blayout\b",
+                    r"\bvisual\b", r"\bbrand\b",
+                ]
+                needs_design = any(
+                    re.search(kw, task_text) for kw in design_keywords
+                )
+                if not needs_design:
+                    return WorkflowPhase.CODE
             return successors[0]
 
         # Default: follow the first successor

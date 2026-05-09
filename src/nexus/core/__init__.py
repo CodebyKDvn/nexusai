@@ -2,9 +2,13 @@
 
 from nexus.core.agent import Agent, AgentId, AgentRole
 from nexus.core.crew import CrewAssembler, CrewAssignment, TaskCategory
+from nexus.core.evaluation import MetricsLogger, SelfEvaluator
+from nexus.core.hitl import ApprovalGateManager, ApprovalRequest, GateType
 from nexus.core.loop import AgentLoop
 from nexus.core.message import Message, MessageBus, MessageType
+from nexus.core.observability import Tracer
 from nexus.core.parallel import ParallelExecutionEngine, ParallelResult, ParallelTask
+from nexus.core.recovery import RecoveryManager, RetryPolicy
 from nexus.core.registry import AgentRegistry
 from nexus.core.state import (
     CheckpointManager,
@@ -21,21 +25,29 @@ __all__ = [
     "AgentLoop",
     "AgentRegistry",
     "AgentRole",
+    "ApprovalGateManager",
+    "ApprovalRequest",
     "CheckpointManager",
     "CrewAssembler",
     "CrewAssignment",
+    "GateType",
     "Message",
     "MessageBus",
     "MessageType",
+    "MetricsLogger",
     "ParallelExecutionEngine",
     "ParallelResult",
     "ParallelTask",
+    "RecoveryManager",
+    "RetryPolicy",
+    "SelfEvaluator",
     "TaskCategory",
     "TaskGraph",
     "TaskState",
     "TaskStatus",
     "Tool",
     "ToolResult",
+    "Tracer",
     "WorkflowEngine",
     "WorkflowGraph",
     "WorkflowPhase",

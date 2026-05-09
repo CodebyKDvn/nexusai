@@ -101,6 +101,47 @@ def create_app(config: NexusConfig | None = None) -> FastAPI:
     async def task_graph_status() -> dict[str, Any]:
         return team.task_graph.summary()
 
+    # --- Reliability & Production-grade (Group 2) endpoints ---
+
+    @app.get("/api/approval-gates")
+    async def approval_gates_status() -> dict[str, Any]:
+        return team.approval_gates.summary()
+
+    @app.get("/api/approval-gates/pending")
+    async def approval_pending() -> list[dict[str, Any]]:
+        return [r.to_dict() for r in team.approval_gates.pending_requests]
+
+    @app.post("/api/approval-gates/{request_id}")
+    async def approval_resolve(
+        request_id: str,
+        approved: bool = True,
+        comment: str = "",
+    ) -> dict[str, Any]:
+        result = team.approval_gates.resolve(
+            request_id, approved=approved, comment=comment,
+        )
+        if result is None:
+            return {"error": f"Request {request_id} not found"}
+        return result.to_dict()
+
+    @app.get("/api/evaluations")
+    async def evaluations(limit: int = 20) -> dict[str, Any]:
+        return team.evaluator.logger.summary()
+
+    @app.get("/api/observability")
+    async def observability() -> dict[str, Any]:
+        return team.tracer.summary()
+
+    @app.get("/api/observability/traces")
+    async def traces(limit: int = 20) -> list[dict[str, Any]]:
+        return [t.to_dict() for t in team.tracer.store.recent(limit)]
+
+    @app.get("/api/recovery")
+    async def recovery_status() -> dict[str, Any]:
+        if team.recovery is None:
+            return {"total_recoveries": 0}
+        return team.recovery.summary()
+
     @app.get("/api/memory")
     async def memory(query: str = "") -> dict[str, Any]:
         if query:

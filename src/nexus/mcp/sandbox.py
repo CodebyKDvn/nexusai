@@ -11,25 +11,25 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Commands that are never allowed
-BLOCKED_COMMANDS = frozenset({
-    "rm -rf /",
-    "mkfs",
-    "dd if=/dev/zero",
+# Exact commands that are never allowed (matched as full command)
+BLOCKED_EXACT = frozenset({
     ":(){ :|:& };:",
-    "> /dev/sda",
-    "chmod -R 777 /",
 })
 
-# Patterns that suggest destructive operations
-DANGEROUS_PATTERNS = [
-    "rm -rf /",
-    "rm -rf /*",
-    "format c:",
-    "shutdown",
-    "reboot",
-    "init 0",
-    "init 6",
+# Regex patterns for destructive operations.
+# These are anchored so that e.g. "rm -rf /tmp/build" is allowed
+# but "rm -rf /" and "rm -rf /*" are blocked.
+DANGEROUS_REGEXES: list[re.Pattern[str]] = [
+    re.compile(r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\s*$"),    # rm -rf /
+    re.compile(r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\*"),       # rm -rf /*
+    re.compile(r"chmod\s+-r\s+777\s+/\s*$"),               # chmod -R 777 /
+    re.compile(r"mkfs\.?"),                                 # mkfs / mkfs.*
+    re.compile(r"dd\s+if=/dev/zero"),                       # dd if=/dev/zero
+    re.compile(r">\s*/dev/sda"),                            # > /dev/sda
+    re.compile(r"format\s+c:"),                             # format c:
+    re.compile(r"\bshutdown\b"),
+    re.compile(r"\breboot\b"),
+    re.compile(r"\binit\s+[06]\b"),
 ]
 
 
@@ -69,12 +69,11 @@ class Sandbox:
         cmd_lower = command.lower().strip()
         cmd_normalized = re.sub(r"\s+", " ", cmd_lower)
 
-        for blocked in BLOCKED_COMMANDS:
-            if blocked in cmd_normalized:
-                raise SandboxError(f"Blocked command: {command}")
+        if cmd_normalized in BLOCKED_EXACT:
+            raise SandboxError(f"Blocked command: {command}")
 
-        for pattern in DANGEROUS_PATTERNS:
-            if pattern in cmd_normalized:
+        for pattern in DANGEROUS_REGEXES:
+            if pattern.search(cmd_normalized):
                 raise SandboxError(
                     f"Potentially dangerous command detected: {command}"
                 )
