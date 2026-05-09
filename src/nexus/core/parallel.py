@@ -191,6 +191,7 @@ class ParallelExecutionEngine:
                     TaskStatus.COMPLETED,
                     agent_id=task.agent_id,
                     reason="Parallel execution completed",
+                    auto_checkpoint=False,
                 )
 
             return ParallelResult(

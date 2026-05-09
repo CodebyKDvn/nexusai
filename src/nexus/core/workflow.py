@@ -438,7 +438,7 @@ class WorkflowEngine:
             # Check if design is optional and task doesn't need it
             design_node = self.graph.get_node(WorkflowPhase.DESIGN)
             if design_node and not design_node.required and WorkflowPhase.CODE in successors:
-                return WorkflowPhase.DESIGN
+                return WorkflowPhase.CODE
             return successors[0]
 
         # Default: follow the first successor

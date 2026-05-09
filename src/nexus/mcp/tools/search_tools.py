@@ -68,7 +68,7 @@ class GrepSearchTool(MCPTool):
         case_insensitive = params.get("case_insensitive", False)
         max_results = params.get("max_results", 100) or 100
 
-        args = ["rg", "--line-number", "--max-count", str(max_results)]
+        args = ["rg", "--line-number"]
         if case_insensitive:
             args.append("-i")
         if include:
@@ -87,6 +87,10 @@ class GrepSearchTool(MCPTool):
                 )
 
             lines = output.split("\n") if output else []
+            # Truncate to max_results total (not per-file)
+            if len(lines) > max_results:
+                lines = lines[:max_results]
+                output = "\n".join(lines)
             header = f'Found {len(lines)} match(es) for pattern "{pattern}" in "{path}"'
             if include:
                 header += f' (filter: "{include}")'
@@ -94,7 +98,7 @@ class GrepSearchTool(MCPTool):
 
         except FileNotFoundError:
             # Fallback to system grep
-            args_grep = ["grep", "-rn", "--max-count", str(max_results)]
+            args_grep = ["grep", "-rn"]
             if case_insensitive:
                 args_grep.append("-i")
             if include:
@@ -105,6 +109,10 @@ class GrepSearchTool(MCPTool):
                     args_grep, capture_output=True, text=True, timeout=15
                 )
                 output = result.stdout.strip() or "No matches found."
+                # Truncate to max_results total
+                lines = output.split("\n")
+                if len(lines) > max_results:
+                    output = "\n".join(lines[:max_results])
                 return MCPToolResult.text(output)
             except Exception as e:
                 return MCPToolResult.error(f"Search failed: {e}")
