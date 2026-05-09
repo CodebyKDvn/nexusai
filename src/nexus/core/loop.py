@@ -10,6 +10,7 @@ from nexus.core.message import Message, MessageType
 
 if TYPE_CHECKING:
     from nexus.core.agent import Agent
+    from nexus.core.message import MessageBus
     from nexus.core.registry import AgentRegistry
 
 logger = logging.getLogger(__name__)
@@ -27,8 +28,9 @@ class LoopState:
 class AgentLoop:
     """Drives the understand → plan → act → observe → reflect cycle."""
 
-    def __init__(self, registry: AgentRegistry, max_iterations: int = 20) -> None:
+    def __init__(self, registry: AgentRegistry, bus: MessageBus | None = None, max_iterations: int = 20) -> None:
         self.registry = registry
+        self.bus = bus
         self.max_iterations = max_iterations
         self._state = LoopState(max_iterations=max_iterations)
 
@@ -50,6 +52,10 @@ class AgentLoop:
 
         pending: list[tuple[Agent, Message]] = [(target, initial_message)]
 
+        # Publish initial message if not already published
+        if self.bus and not initial_message.published:
+            self.bus.publish(initial_message)
+
         while pending and self._state.iteration < self.max_iterations:
             self._state.iteration += 1
             next_pending: list[tuple[Agent, Message]] = []
@@ -70,6 +76,10 @@ class AgentLoop:
 
                 if response is None:
                     continue
+
+                # Publish to bus so UI/observability can see it
+                if self.bus and not response.published:
+                    self.bus.publish(response)
 
                 self._state.results.append(response.to_dict())
 

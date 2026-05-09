@@ -8,18 +8,46 @@ from pathlib import Path
 
 import yaml
 
+# NVIDIA NIM model assignments per agent role
+NVIDIA_AGENT_MODELS: dict[str, str] = {
+    "orchestrator": "moonshotai/kimi-k2-instruct",
+    "planner": "z-ai/glm-5.1",
+    "lead_developer": "deepseek-ai/deepseek-v4-pro",
+    "developer": "deepseek-ai/deepseek-v4-flash",
+    "frontend_developer": "minimaxai/minimax-m2.7",
+    "backend_developer": "deepseek-ai/deepseek-v4-pro",
+    "ux_ui_designer": "moonshotai/kimi-k2-instruct",
+    "debugger": "deepseek-ai/deepseek-v4-flash",
+    "qa": "google/gemma-4-31b-it",
+    "research": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "memory": "qwen/qwen3.5-397b-a17b",
+    "critic": "deepseek-ai/deepseek-v4-flash",
+    "tool_executor": "mistralai/mistral-nemotron",
+}
+
+# Roles that don't use LLM directly — skip LLM initialization for these
+NO_LLM_ROLES: frozenset[str] = frozenset({
+    "memory", "tool_executor",
+    "lead_developer", "developer",  # replaced by frontend/backend_developer
+})
+
 
 @dataclass
 class LLMConfig:
-    provider: str = "openai"
-    model: str = "gpt-4o"
+    provider: str = "nvidia"
+    model: str = "deepseek-ai/deepseek-v4-pro"
     temperature: float = 0.2
     max_tokens: int = 4096
     api_key: str = ""
 
     def __post_init__(self) -> None:
         if not self.api_key:
-            env_key = "OPENAI_API_KEY" if self.provider == "openai" else "ANTHROPIC_API_KEY"
+            env_keys = {
+                "nvidia": "NVIDIA_API_KEY",
+                "openai": "OPENAI_API_KEY",
+                "anthropic": "ANTHROPIC_API_KEY",
+            }
+            env_key = env_keys.get(self.provider, "NVIDIA_API_KEY")
             self.api_key = os.environ.get(env_key, "")
 
 
@@ -43,6 +71,7 @@ class NexusConfig:
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     sandbox: SandboxConfig = field(default_factory=SandboxConfig)
     project_dir: str = "."
+    gitnexus: bool = False
     log_level: str = "INFO"
     max_iterations: int = 20
 
@@ -59,6 +88,7 @@ class NexusConfig:
                 memory=MemoryConfig(**data.get("memory", {})),
                 sandbox=SandboxConfig(**data.get("sandbox", {})),
                 project_dir=data.get("project_dir", "."),
+                gitnexus=data.get("gitnexus", False),
                 log_level=data.get("log_level", "INFO"),
                 max_iterations=data.get("max_iterations", 20),
             )
@@ -85,6 +115,7 @@ class NexusConfig:
                 "timeout_seconds": self.sandbox.timeout_seconds,
             },
             "project_dir": self.project_dir,
+            "gitnexus": self.gitnexus,
             "log_level": self.log_level,
             "max_iterations": self.max_iterations,
         }

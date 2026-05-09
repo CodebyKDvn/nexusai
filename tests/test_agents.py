@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from nexus.agents.backend_developer import BackendDeveloperAgent
 from nexus.agents.critic import CriticAgent
 from nexus.agents.debugger import DebuggerAgent
-from nexus.agents.developer import DeveloperAgent
+from nexus.agents.frontend_developer import FrontendDeveloperAgent
 from nexus.agents.memory_agent import MemoryAgentImpl
 from nexus.agents.orchestrator import OrchestratorAgent
 from nexus.agents.planner import PlannerAgent
 from nexus.agents.qa import QAAgent
 from nexus.agents.research import ResearchAgent
 from nexus.agents.tool_executor import ToolExecutorAgent
+from nexus.agents.ux_ui_designer import UxUiDesignerAgent
 from nexus.core.message import Message, MessageBus, MessageType
 from nexus.core.tool import ToolRegistry
 from nexus.memory.manager import MemoryManager
@@ -63,6 +65,51 @@ class TestOrchestratorAgent:
 
         assert response is not None
         assert response.recipient == "qa"
+
+    def test_rule_based_delegation_design(self) -> None:
+        bus = MessageBus()
+        agent = OrchestratorAgent("orchestrator", bus)
+
+        msg = Message(
+            sender="user",
+            recipient="orchestrator",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Design a prototype for the dashboard"},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.recipient == "ux_ui_designer"
+
+    def test_rule_based_delegation_frontend(self) -> None:
+        bus = MessageBus()
+        agent = OrchestratorAgent("orchestrator", bus)
+
+        msg = Message(
+            sender="user",
+            recipient="orchestrator",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Build a React login component with CSS"},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.recipient == "frontend_developer"
+
+    def test_rule_based_delegation_backend(self) -> None:
+        bus = MessageBus()
+        agent = OrchestratorAgent("orchestrator", bus)
+
+        msg = Message(
+            sender="user",
+            recipient="orchestrator",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Create a REST API endpoint for user management"},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.recipient == "backend_developer"
 
     def test_handle_task_result(self) -> None:
         bus = MessageBus()
@@ -130,22 +177,97 @@ class TestPlannerAgent:
         assert response is None
 
 
-class TestDeveloperAgent:
-    def test_stub_response(self) -> None:
+class TestUxUiDesignerAgent:
+    def test_stub_design_direction(self) -> None:
         bus = MessageBus()
-        agent = DeveloperAgent("developer", bus)
+        agent = UxUiDesignerAgent("ux_ui_designer", bus)
 
         msg = Message(
             sender="orchestrator",
-            recipient="developer",
+            recipient="ux_ui_designer",
             type=MessageType.TASK_REQUEST,
-            payload={"task": "Implement user authentication", "context": ""},
+            payload={"task": "Design a visual style for the landing page", "context": ""},
         )
         response = agent.process(msg)
 
         assert response is not None
         assert response.type == MessageType.TASK_RESULT
         assert response.payload["status"] == "needs_review"
+        result = response.payload.get("result", {})
+        assert result.get("action") == "recommend_directions"
+        assert len(result.get("directions", [])) == 3
+
+    def test_stub_specific_design(self) -> None:
+        bus = MessageBus()
+        agent = UxUiDesignerAgent("ux_ui_designer", bus)
+
+        msg = Message(
+            sender="orchestrator",
+            recipient="ux_ui_designer",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Create a prototype for a mobile login screen", "context": ""},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.type == MessageType.TASK_RESULT
+        result = response.payload.get("result", {})
+        assert result.get("action") == "complete"
+        assert "design_spec" in result
+        assert "suggestions" in result
+
+    def test_ignores_non_task_messages(self) -> None:
+        bus = MessageBus()
+        agent = UxUiDesignerAgent("ux_ui_designer", bus)
+
+        msg = Message(
+            sender="orchestrator",
+            recipient="ux_ui_designer",
+            type=MessageType.EVENT,
+            payload={"event": "some_event"},
+        )
+        response = agent.process(msg)
+        assert response is None
+
+
+class TestFrontendDeveloperAgent:
+    def test_stub_response(self) -> None:
+        bus = MessageBus()
+        agent = FrontendDeveloperAgent("frontend_developer", bus)
+
+        msg = Message(
+            sender="orchestrator",
+            recipient="frontend_developer",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Build a login form component", "context": ""},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.type == MessageType.TASK_RESULT
+        assert response.payload["status"] == "needs_review"
+        result = response.payload.get("result", {})
+        assert "suggestions" in result
+
+
+class TestBackendDeveloperAgent:
+    def test_stub_response(self) -> None:
+        bus = MessageBus()
+        agent = BackendDeveloperAgent("backend_developer", bus)
+
+        msg = Message(
+            sender="orchestrator",
+            recipient="backend_developer",
+            type=MessageType.TASK_REQUEST,
+            payload={"task": "Build a REST API for users", "context": ""},
+        )
+        response = agent.process(msg)
+
+        assert response is not None
+        assert response.type == MessageType.TASK_RESULT
+        assert response.payload["status"] == "needs_review"
+        result = response.payload.get("result", {})
+        assert "suggestions" in result
 
 
 class TestDebuggerAgent:
@@ -201,6 +323,24 @@ class TestResearchAgent:
         assert response is not None
         result = response.payload.get("result", {})
         assert "findings" in result
+
+    def test_system_prompt_includes_gitnexus_when_tools_available(self) -> None:
+        from nexus.core.tool import ToolRegistry
+        from nexus.tools.gitnexus import GitNexusQueryTool
+
+        bus = MessageBus()
+        registry = ToolRegistry()
+        registry.register(GitNexusQueryTool())
+        agent = ResearchAgent("research", bus, tools=registry)
+
+        assert "gitnexus_query" in agent.system_prompt
+        assert "GitNexus" in agent.system_prompt
+
+    def test_system_prompt_excludes_gitnexus_without_tools(self) -> None:
+        bus = MessageBus()
+        agent = ResearchAgent("research", bus)
+
+        assert "gitnexus" not in agent.system_prompt.lower()
 
 
 class TestMemoryAgentImpl:

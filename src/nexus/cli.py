@@ -5,18 +5,48 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from nexus.config import NexusConfig
 from nexus.team import NexusTeam
+from nexus.ui.app import NexusTerminal
 from nexus.ui.terminal import TerminalUI
 
+if TYPE_CHECKING:
+    from nexus.core.message import Message
+
+
+def setup_logging(verbose: bool) -> None:
+    """Setup logging: technical logs to file, clean output to console."""
+    log_dir = Path(".nexus")
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / "nexus.log"
+
+    # Create formatters
+    file_formatter = logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+
+    # File handler (all logs)
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(file_formatter)
+
+    # Root logger setup
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG if verbose else logging.INFO)
+    root_logger.addHandler(file_handler)
+
+    # Suppress noisy logs from libraries
+    for logger_name in ["httpx", "openai", "chromadb", "urllib3", "httpcore"]:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 @click.group(invoke_without_command=True)
 @click.option("--config", "-c", type=click.Path(), default=None, help="Config file path")
-@click.option("--provider", "-p", type=click.Choice(["openai", "anthropic"]), default=None)
+@click.option("--provider", "-p", type=click.Choice(["nvidia", "openai", "anthropic"]), default=None)
 @click.option("--model", "-m", default=None, help="LLM model name")
+@click.option("--classic", is_flag=True, help="Use classic terminal (better Vietnamese IME support)")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.pass_context
 def main(
@@ -24,13 +54,11 @@ def main(
     config: str | None,
     provider: str | None,
     model: str | None,
+    classic: bool,
     verbose: bool,
 ) -> None:
     """Nexus AI — Multi-Agent AI Development Platform."""
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    )
+    setup_logging(verbose)
 
     cfg = NexusConfig.load(config)
     if provider:
@@ -42,58 +70,52 @@ def main(
     ctx.obj["config"] = cfg
 
     if ctx.invoked_subcommand is None:
-        _interactive(cfg)
+        if classic:
+            _classic_interactive(cfg)
+        else:
+            _interactive(cfg)
 
 
 def _interactive(config: NexusConfig) -> None:
-    """Run the interactive REPL."""
+    """Run the interactive full-screen TUI."""
+    team = NexusTeam(config)
+    app = NexusTerminal(config, team)
+    app.run()
+
+
+def _classic_interactive(config: NexusConfig) -> None:
+    """Run the classic terminal UI with better IME support."""
+    team = NexusTeam(config)
     ui = TerminalUI()
     ui.show_banner()
 
-    team = NexusTeam(config)
-    ui.show_info(f"Initialized with {team.agent_count} agents")
+    # Hook into agent messages to display them in the UI
+    def on_message(msg: Message) -> None:
+        ui.show_agent_message(
+            sender=msg.sender,
+            recipient=msg.recipient,
+            msg_type=msg.type.value,
+            content=str(msg.payload.get("task") or msg.payload.get("result") or msg.payload),
+        )
 
-    if config.llm.api_key:
-        ui.show_info(f"LLM: {config.llm.provider}/{config.llm.model}")
-    else:
-        ui.show_info("No LLM API key set — using rule-based mode (set OPENAI_API_KEY or ANTHROPIC_API_KEY)")
+    team.bus.subscribe("__broadcast__", on_message)
 
     while True:
         try:
-            user_input = ui.prompt()
-        except (KeyboardInterrupt, EOFError):
-            ui.show_info("\nGoodbye!")
-            break
-
-        user_input = user_input.strip()
-        if not user_input:
-            continue
-
-        if user_input.startswith("/"):
-            if _handle_command(ui, team, config, user_input):
+            query = ui.prompt()
+            if not query:
                 continue
-            if user_input in ("/quit", "/exit", "/q"):
-                ui.show_info("Goodbye!")
+            if query.lower() in ["/quit", "exit", "quit"]:
                 break
-            continue
 
-        ui.show_thinking("orchestrator", "Processing your request...")
-
-        try:
-            result = team.run(user_input)
+            if not _handle_command(ui, team, config, query):
+                with ui.status("Nexus Team is collaborating..."):
+                    result = team.run(query)
+                    ui.show_result(result.get("output", "Task completed."))
+        except KeyboardInterrupt:
+            break
         except Exception as e:
             ui.show_error(f"Error: {e}")
-            continue
-
-        output = result.get("output", "")
-        if isinstance(output, dict):
-            output = json.dumps(output, indent=2)
-
-        ui.show_result(str(output))
-
-        if result.get("errors"):
-            for error in result["errors"]:
-                ui.show_error(f"  {error}")
 
 
 def _handle_command(ui: TerminalUI, team: NexusTeam, config: NexusConfig, cmd: str) -> bool:
@@ -103,6 +125,25 @@ def _handle_command(ui: TerminalUI, team: NexusTeam, config: NexusConfig, cmd: s
 
     if command == "/help":
         ui.show_help()
+        return True
+
+    if command == "/mode":
+        new_mode = ui.toggle_mode()
+        ui.show_info(f"  Switched mode to: {new_mode.upper()}")
+        return True
+
+    if command == "/toggle":
+        ui.show_thoughts = not getattr(ui, 'show_thoughts', True)
+        status = "ON" if ui.show_thoughts else "OFF"
+        ui.show_info(f"  Agent thoughts visibility: {status}")
+        return True
+
+    if command == "/attach":
+        if args:
+            ui.show_info(f"  Attached file: {args}")
+            team.memory.remember(f"User attached file: {args}", category="file_attachment")
+        else:
+            ui.show_error("  Usage: /attach <path/to/image_or_file>")
         return True
 
     if command == "/status":
@@ -175,6 +216,85 @@ def init(ctx: click.Context) -> None:
     config = ctx.obj["config"]
     config.save()
     click.echo("Nexus AI initialized. Config saved to .nexus/config.yaml")
+
+
+@main.command()
+@click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", "-p", default=8000, type=int, help="Port to listen on")
+@click.option("--reload", is_flag=True, help="Enable auto-reload for development")
+@click.pass_context
+def serve(ctx: click.Context, host: str, port: int, reload: bool) -> None:
+    """Start the web chat interface."""
+    import uvicorn
+
+    config = ctx.obj["config"]
+    click.echo(f"Starting Nexus AI web interface on http://{host}:{port}")
+    click.echo(f"Provider: {config.llm.provider} | Model: {config.llm.model}")
+    if not config.llm.api_key:
+        click.echo("Warning: No API key set — using rule-based mode")
+    click.echo("Press Ctrl+C to stop\n")
+
+    if reload:
+        # Reload mode requires string import path; config from file/env only
+        uvicorn.run(
+            "nexus.web.server:create_app",
+            host=host,
+            port=port,
+            reload=True,
+            factory=True,
+            log_level="info",
+        )
+    else:
+        # Non-reload: pass the pre-configured app so CLI overrides are kept
+        from nexus.web.server import create_app
+
+        app = create_app(config)
+        uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+@main.command()
+@click.option("--host", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", default=9090, type=int, help="Port to listen on")
+@click.pass_context
+def mcp(ctx: click.Context, host: str, port: int) -> None:
+    """Start the MCP tool server (Nexus Skill-Core)."""
+    import uvicorn
+
+    from nexus.mcp import MCPServer
+
+    server = MCPServer()
+    tools = server.store.list_tools()
+    click.echo(f"Starting Nexus Skill-Core MCP Server on http://{host}:{port}")
+    click.echo(f"Registered tools: {len(tools)}")
+    for tool in tools:
+        click.echo(f"  - {tool.name} ({tool.category}): {tool.source}")
+    nvidia_ok = server.store.nvidia_wrapper.is_configured
+    click.echo(f"NVIDIA NIM: {'configured' if nvidia_ok else 'not configured (code tools disabled)'}")
+    click.echo("Press Ctrl+C to stop\n")
+
+    app = server.create_app()
+    uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+@main.command(name="mcp-tools")
+@click.option("--category", "-c", default=None, help="Filter by category")
+@click.option("--source", "-s", default=None, help="Filter by source (claude/gemini/codex)")
+def mcp_tools(category: str | None, source: str | None) -> None:
+    """List all available MCP tools."""
+    from nexus.mcp.tools import ALL_MCP_TOOLS
+
+    tools = ALL_MCP_TOOLS
+    if category:
+        tools = [t for t in tools if t.category == category]
+    if source:
+        tools = [t for t in tools if source in t.source]
+
+    click.echo(f"MCP Tools ({len(tools)}):\n")
+    for tool in sorted(tools, key=lambda t: (t.category, t.name)):
+        click.echo(f"  [{tool.category}] {tool.name}")
+        click.echo(f"    Source: {tool.source}")
+        click.echo(f"    {tool.description.split('.')[0]}.")
+        click.echo()
 
 
 if __name__ == "__main__":

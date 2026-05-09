@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -82,7 +81,7 @@ Respond with:
         return message.reply(
             MessageType.TASK_RESULT,
             {
-                "status": "complete",
+                "status": "reviewed",
                 "result": evaluation,
             },
         )
@@ -108,10 +107,10 @@ Respond with:
         ]
         response = self.llm.chat(messages)
 
-        try:
-            result: dict[str, Any] = json.loads(response.content)
+        result = self.parse_json(response.content)
+        if result is not None:
             return result
-        except json.JSONDecodeError:
+        else:
             return {
                 "overall_score": 5.0,
                 "verdict": "revise",
@@ -119,8 +118,9 @@ Respond with:
                 "lessons_learned": [],
             }
 
-    def _evaluate_stub(self, content: str) -> dict[str, Any]:
-        has_content = bool(content and len(content) > 10)
+    def _evaluate_stub(self, content: str | Any) -> dict[str, Any]:
+        text = str(content) if content else ""
+        has_content = bool(text and len(text) > 10)
         return {
             "scores": {
                 "correctness": 7 if has_content else 3,

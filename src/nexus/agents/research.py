@@ -33,24 +33,50 @@ class ResearchAgent(Agent):
         self.tools = tools
 
     @property
+    def _has_gitnexus(self) -> bool:
+        return bool(self.tools and self.tools.get("gitnexus_query"))
+
+    @property
     def system_prompt(self) -> str:
-        return """You are the Research Agent. Your job is to find information needed by the team.
+        gitnexus_section = ""
+        if self._has_gitnexus:
+            gitnexus_section = """
+
+GitNexus Code Intelligence (PREFERRED for code analysis):
+Use these tools FIRST before falling back to grep — they query a knowledge graph
+instead of reading entire files, saving tokens significantly.
+
+- gitnexus_query: Search by concept (e.g. "auth validation", "database models")
+- gitnexus_context: Get 360° view of a symbol (callers, callees, execution flows)
+- gitnexus_impact: Blast radius analysis before editing a symbol
+- gitnexus_detect_changes: Map git diffs to affected symbols/processes
+- gitnexus_analyze: Index a repo (run first if repo not yet indexed)
+- gitnexus_status: Check index freshness
+
+Strategy: gitnexus_query first → gitnexus_context for details → grep only for exact text."""
+
+        tool_list = "grep | browser | api_call"
+        if self._has_gitnexus:
+            tool_list += " | gitnexus_query | gitnexus_context | gitnexus_impact"
+
+        return f"""You are the Research Agent. Your job is to find information needed by the team.
 
 Capabilities:
 1. Search code with grep
 2. Browse documentation and websites
 3. Make API calls to fetch data
 4. Analyze and summarize findings
+{gitnexus_section}
 
 Respond with:
-{
+{{
     "action": "search" | "browse" | "summarize" | "complete",
-    "tool": "grep | browser | api_call",
-    "params": {},
+    "tool": "{tool_list}",
+    "params": {{}},
     "findings": "summary of what was found",
     "sources": ["source URLs or file paths"],
     "recommendations": ["actionable recommendations"]
-}"""
+}}"""
 
     def process(self, message: Message) -> Message | None:
         if message.type != MessageType.TASK_REQUEST:
@@ -93,9 +119,8 @@ Respond with:
 
         for _ in range(5):
             response = self.llm.chat(messages)
-            try:
-                decision: dict[str, Any] = json.loads(response.content)
-            except json.JSONDecodeError:
+            decision = self.parse_json(response.content)
+            if decision is None:
                 return {"findings": response.content, "sources": []}
 
             action = decision.get("action", "complete")
@@ -123,15 +148,27 @@ Respond with:
             "recommendations": [],
         }
 
-        if self.tools:
-            grep = self.tools.get("grep")
-            if grep:
-                keywords = task.split()[:3]
-                for kw in keywords:
-                    if len(kw) > 3:
-                        search_result = grep.execute(pattern=kw)
-                        if search_result.ok and search_result.output != "No matches found.":
-                            results["sources"].append(f"grep:{kw}")
-                            results["findings"] += f"\nFound matches for '{kw}'"
+        if not self.tools:
+            return results
+
+        # Prefer GitNexus knowledge graph over raw grep
+        gitnexus_query = self.tools.get("gitnexus_query")
+        if gitnexus_query:
+            search_result = gitnexus_query.execute(query=task)
+            if search_result.ok and search_result.output:
+                results["sources"].append("gitnexus:knowledge_graph")
+                results["findings"] += f"\nGitNexus results:\n{search_result.output[:500]}"
+                return results
+
+        # Fallback to grep
+        grep = self.tools.get("grep")
+        if grep:
+            keywords = task.split()[:3]
+            for kw in keywords:
+                if len(kw) > 3:
+                    search_result = grep.execute(pattern=kw)
+                    if search_result.ok and search_result.output != "No matches found.":
+                        results["sources"].append(f"grep:{kw}")
+                        results["findings"] += f"\nFound matches for '{kw}'"
 
         return results

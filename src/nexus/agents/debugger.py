@@ -111,9 +111,8 @@ Respond with:
 
         for _ in range(5):
             response = self.llm.chat(messages)
-            try:
-                decision: dict[str, Any] = json.loads(response.content)
-            except json.JSONDecodeError:
+            decision = self.parse_json(response.content)
+            if decision is None:
                 return {"diagnosis": response.content, "summary": response.content}
 
             if decision.get("action") == "investigate" and self.tools:

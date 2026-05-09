@@ -97,3 +97,4 @@ dmypy.json
 .ruff_cache/
 
 .nexus/memory/
+.nexus_state/

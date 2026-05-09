@@ -10,6 +10,7 @@ from nexus.tools.file_ops import (
     FileWriteTool,
 )
 from nexus.tools.git_ops import GitCommitTool, GitDiffTool, GitStatusTool
+from nexus.tools.gitnexus import GITNEXUS_TOOLS, is_gitnexus_available
 from nexus.tools.search import GrepTool
 from nexus.tools.terminal import TerminalTool
 
@@ -28,6 +29,12 @@ def create_default_registry() -> ToolRegistry:
     registry.register(GitCommitTool())
     registry.register(BrowserTool())
     registry.register(APITool())
+
+    # Register GitNexus code intelligence tools when available
+    if is_gitnexus_available():
+        for tool in GITNEXUS_TOOLS:
+            registry.register(tool)
+
     return registry
 
 
@@ -38,6 +45,7 @@ __all__ = [
     "FileEditTool",
     "FileReadTool",
     "FileWriteTool",
+    "GITNEXUS_TOOLS",
     "GitCommitTool",
     "GitDiffTool",
     "GitStatusTool",
@@ -49,4 +57,5 @@ __all__ = [
     "ToolResult",
     "ToolStatus",
     "create_default_registry",
+    "is_gitnexus_available",
 ]

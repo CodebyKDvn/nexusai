@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from nexus.core.agent import Agent, AgentId, AgentRole
@@ -31,6 +31,8 @@ class OrchestratorAgent(Agent):
         self._task_queue: list[dict[str, Any]] = []
         self._active_tasks: dict[str, dict[str, Any]] = {}
         self._completed_tasks: list[dict[str, Any]] = []
+        self._review_counts: dict[str, int] = {}
+        self._max_reviews: int = 2
 
         self.bus.subscribe(BROADCAST, self._on_broadcast)
 
@@ -51,7 +53,9 @@ Your responsibilities:
 
 You delegate to these agents:
 - planner: For breaking down complex tasks into structured plans
-- developer: For writing code and implementing features
+- ux_ui_designer: For UX/UI design, prototypes, wireframes, visual style, design direction
+- frontend_developer: For building UIs, layouts, CSS, client-side logic, React/Vue/Angular
+- backend_developer: For building APIs, databases, server-side logic, authentication
 - debugger: For finding and fixing bugs
 - qa: For writing and running tests
 - research: For looking up documentation and external knowledge
@@ -112,15 +116,19 @@ Respond with a JSON object containing:
         ]
         response = self.llm.chat(messages)
 
-        try:
-            decision = json.loads(response.content)
-        except json.JSONDecodeError:
+        decision = self.parse_json(response.content)
+        if decision is None:
             decision = {"action": "respond", "response": response.content}
 
         action = decision.get("action", "respond")
 
         if action == "delegate":
             target = decision.get("target_agent", "planner")
+            self._active_tasks[correlation_id] = {
+                "task": task,
+                "target": target,
+                "status": "delegated",
+            }
             return self.send(
                 target,
                 MessageType.TASK_REQUEST,
@@ -145,21 +153,63 @@ Respond with a JSON object containing:
                 },
             )
 
+    @staticmethod
+    def _matches(task_lower: str, keywords: list[str]) -> bool:
+        """Check if any keyword matches as a whole word in the task."""
+        return any(
+            re.search(r'\b' + re.escape(kw) + r'\b', task_lower)
+            for kw in keywords
+        )
+
     def _delegate_rule_based(
         self, message: Message, task: str, correlation_id: str
     ) -> Message | None:
         task_lower = task.lower()
+        m = self._matches
 
-        if any(kw in task_lower for kw in ["plan", "design", "architect", "break down"]):
+        if m(
+            task_lower,
+            [
+                "ui design", "ux design", "visual design",
+                "ux", "prototype", "mockup", "wireframe",
+                "visual", "brand", "typography", "color scheme",
+                "landing page design", "infographic",
+            ],
+        ):
+            target = "ux_ui_designer"
+        elif m(task_lower, ["plan", "design", "architect", "break down"]):
             target = "planner"
-        elif any(kw in task_lower for kw in ["bug", "fix", "error", "debug"]):
+        elif m(task_lower, ["bug", "fix", "error", "debug"]):
             target = "debugger"
-        elif any(kw in task_lower for kw in ["test", "verify", "validate", "qa"]):
+        elif m(task_lower, ["test", "verify", "validate", "qa"]):
             target = "qa"
-        elif any(kw in task_lower for kw in ["search", "find", "look up", "research", "docs"]):
+        elif m(
+            task_lower,
+            [
+                "search", "find", "look up", "research", "docs",
+                "analyze codebase", "code intelligence", "knowledge graph",
+                "index repo", "blast radius", "impact analysis",
+            ],
+        ):
             target = "research"
-        elif any(kw in task_lower for kw in ["review", "evaluate", "critique", "improve"]):
+        elif m(task_lower, ["review", "evaluate", "critique", "improve"]):
             target = "critic"
+        elif m(
+            task_lower,
+            [
+                "frontend", "ui", "component", "css", "html", "react",
+                "vue", "angular", "layout", "style", "responsive",
+            ],
+        ):
+            target = "frontend_developer"
+        elif m(
+            task_lower,
+            [
+                "backend", "api", "database", "server", "endpoint",
+                "rest", "graphql", "auth", "migration",
+            ],
+        ):
+            target = "backend_developer"
         else:
             target = "planner"
 
@@ -181,21 +231,21 @@ Respond with a JSON object containing:
         result = message.payload.get("result", "")
         status = message.payload.get("status", "")
 
-        if correlation_id and correlation_id in self._active_tasks:
-            task_info = self._active_tasks.pop(correlation_id)
-            task_info["status"] = status
-            task_info["result"] = result
-            self._completed_tasks.append(task_info)
-
         if self.memory:
+            result_str = str(result)[:200] if result else ""
             self.memory.remember(
-                f"Task completed by {message.sender}: {result[:200]}",
+                f"Task completed by {message.sender}: {result_str}",
                 category="result",
                 persist=True,
                 collection="reflections",
             )
 
         if status == "needs_review":
+            # Keep task in _active_tasks so we can recover it after review
+            if correlation_id and correlation_id in self._active_tasks:
+                self._active_tasks[correlation_id]["original_content"] = result
+                self._active_tasks[correlation_id]["original_sender"] = message.sender
+
             return self.send(
                 "critic",
                 MessageType.TASK_REQUEST,
@@ -204,6 +254,49 @@ Respond with a JSON object containing:
                     "content": result,
                     "original_sender": message.sender,
                 },
+                correlation_id=correlation_id,
+            )
+
+        # Pop from active tasks on completion (after review check)
+        task_info: dict[str, Any] | None = None
+        if correlation_id and correlation_id in self._active_tasks:
+            task_info = self._active_tasks.pop(correlation_id)
+            task_info["status"] = status
+            task_info["result"] = result
+            self._completed_tasks.append(task_info)
+
+        # If this is a review result from critic, check the verdict
+        if message.sender == "critic" and status == "reviewed":
+            verdict = result.get("verdict", "") if isinstance(result, dict) else ""
+            cid = correlation_id or ""
+            review_count = self._review_counts.get(cid, 0)
+            if verdict == "revise" and review_count < self._max_reviews:
+                self._review_counts[cid] = review_count + 1
+                original_sender = task_info.get("original_sender", "planner") if task_info else "planner"
+                # Re-add task so the next review cycle can find original_sender
+                if correlation_id:
+                    self._active_tasks[correlation_id] = {
+                        "task": task_info.get("task", "") if task_info else "",
+                        "target": original_sender,
+                        "status": "revising",
+                        "original_sender": original_sender,
+                    }
+                return self.send(
+                    original_sender,
+                    MessageType.TASK_REQUEST,
+                    {
+                        "task": f"Please revise your work based on critic feedback: {result.get('raw_feedback', '') or ', '.join(result.get('improvements', []))}",
+                        "context": f"Previous attempt was rejected by critic with score {result.get('overall_score')}. Improvements needed: {result.get('improvements', [])}",
+                    },
+                    correlation_id=correlation_id,
+                )
+            # Critic approved — return the developer's original output
+            original_content = task_info.get("original_content", result) if task_info else result
+            return Message(
+                sender=self.agent_id,
+                recipient="user",
+                type=MessageType.TASK_RESULT,
+                payload={"status": "complete", "result": original_content},
                 correlation_id=correlation_id,
             )
 

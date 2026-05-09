@@ -22,6 +22,9 @@ class AgentRole(StrEnum):
     PLANNER = "planner"
     LEAD_DEVELOPER = "lead_developer"
     DEVELOPER = "developer"
+    FRONTEND_DEVELOPER = "frontend_developer"
+    BACKEND_DEVELOPER = "backend_developer"
+    UX_UI_DESIGNER = "ux_ui_designer"
     DEBUGGER = "debugger"
     QA = "qa"
     RESEARCH = "research"
@@ -102,6 +105,24 @@ class Agent(ABC):
     def clear_context(self) -> None:
         self._context.clear()
         self._iteration_count = 0
+
+    def parse_json(self, content: str) -> dict[str, Any] | None:
+        """Safely parse JSON from LLM response, handling markdown code blocks."""
+        content = content.strip()
+        if content.startswith("```"):
+            # Strip code blocks
+            lines = content.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            content = "\n".join(lines).strip()
+
+        try:
+            import json
+            return json.loads(content) # type: ignore[no-any-return]
+        except json.JSONDecodeError:
+            return None
 
     def __repr__(self) -> str:
         return f"Agent({self.agent_id}, role={self.role.value})"

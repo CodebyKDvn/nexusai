@@ -27,12 +27,12 @@ class StatusBar:
         table.add_column(style="bold cyan")
         table.add_column()
 
-        table.add_row("Status", Text(status, style="bold green" if status == "idle" else "bold yellow"))
-        table.add_row("Agents", str(agents))
-        table.add_row("Iteration", f"{iteration}/{max_iterations}")
-        table.add_row("Memory", str(memory_entries))
+        table.add_row("Status", Text(status.upper(), style="bold #A8D5BA" if status == "idle" else "bold #a166ab"))
+        table.add_row("Agents", f"[#00f2fe]{agents}[/]")
+        table.add_row("Iteration", f"[#a166ab]{iteration}[/]/[dim]{max_iterations}[/dim]")
+        table.add_row("Memory", f"[#ff9a9e]{memory_entries}[/]")
 
-        self.console.print(Panel(table, title="[bold]Nexus AI[/bold]", border_style="blue"))
+        self.console.print(Panel(table, title="[bold #00f2fe]N E X U S[/]", border_style="#a166ab"))
 
 
 class AgentPanel:
@@ -50,21 +50,21 @@ class AgentPanel:
         content: str,
     ) -> None:
         style_map = {
-            "task_request": "bold yellow",
-            "task_result": "bold green",
-            "error": "bold red",
-            "query": "bold cyan",
+            "task_request": "#a166ab",
+            "task_result": "#A8D5BA",
+            "error": "#ff9a9e",
+            "query": "#00f2fe",
             "status": "dim",
-            "reflection": "bold magenta",
+            "reflection": "#a166ab",
         }
         style = style_map.get(msg_type, "white")
 
-        header = Text(f"{sender} -> {recipient}", style=style)
-        body = content[:500]
-        if len(content) > 500:
-            body += "..."
+        header = Text(f" {sender} ➔ {recipient} ", style=f"bold {style} on #1a1a1a")
+        body = content[:1000]
+        if len(content) > 1000:
+            body += "\n[dim]... content truncated ...[/dim]"
 
-        self.console.print(Panel(body, title=header, border_style=style, padding=(0, 1)))
+        self.console.print(Panel(body, title=header, border_style=style, padding=(0, 2)))
 
     def render_plan(self, plan: dict) -> None:  # type: ignore[type-arg]
         table = Table(title="Execution Plan", show_lines=True)

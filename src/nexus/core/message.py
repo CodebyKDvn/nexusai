@@ -31,6 +31,7 @@ class Message:
     correlation_id: str | None = None
     priority: int = 0
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    published: bool = False
 
     def reply(self, type: MessageType, payload: dict[str, Any]) -> Message:
         return Message(
@@ -77,6 +78,7 @@ class MessageBus:
             ]
 
     def publish(self, message: Message) -> None:
+        message.published = True
         self._history.append(message)
         if len(self._history) > self._max_history:
             self._history = self._history[-self._max_history:]
